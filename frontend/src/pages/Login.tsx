@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AuthApiError } from "@supabase/supabase-js";
 import {
   Card,
@@ -14,6 +15,7 @@ import { signIn, signUp } from "@/services/auth";
 import RotatingImage from "@/components/RotatingImage";
 
 export default function AuthCard() {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
 
   const [name, setName] = useState("");
@@ -38,8 +40,9 @@ export default function AuthCard() {
     try {
       if (isLogin) {
         await signIn(email, password);
-         console.log("Logged in!");
-      } else {
+          console.log("Logged in!");
+          navigate("/");    
+      }  else {
         const data = await signUp(email, password, name);
         console.log("SignUp result:", data?.user?.id, data?.user?.email);
         setInfoMsg("Check your inbox to confirm your email, then log in.");
