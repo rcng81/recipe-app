@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { signIn, signUp } from "@/services/auth";
+import RotatingImage from "@/components/RotatingImage";
 
 export default function AuthCard() {
   const [isLogin, setIsLogin] = useState(true);
@@ -112,7 +113,6 @@ export default function AuthCard() {
                 {isLogin ? "Log in" : "Create account"}
               </Button>
 
-              {/* Optional: show basic error in console-only UI */}
               {errMsg && (
                 <span className="sr-only">{errMsg}</span>
               )}
@@ -157,19 +157,17 @@ export default function AuthCard() {
 
       {/* Image Portion */}
       <section className="relative">
-        <img
-          src="https://images.unsplash.com/photo-1600891964599-f61ba0e24092?q=80&w=1600&auto=format&fit=crop"
-          alt="Delicious food"
-          className="h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-l from-black/40 to-transparent" />
-        <div className="absolute inset-0 flex items-end p-8">
-          <h2 className="text-white/90 text-xl font-semibold drop-shadow">
-            Discover & share recipes 🍝
-          </h2>
-        </div>
-      </section>
-    </div>
+        <RotatingImage
+          
+            intervalMs={10000}
+          />
+          <div className="absolute inset-0 flex items-end p-8">
+            <h2 className="text-white/90 text-xl font-semibold drop-shadow">
+              Discover & share recipes 🍝
+            </h2>
+          </div>
+        </section>
+      </div>
   );
 }
 function setInfoMsg(arg0: string) {
