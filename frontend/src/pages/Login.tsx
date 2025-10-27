@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { AuthApiError } from "@supabase/supabase-js";
 import {
   Card,
   CardHeader,
@@ -20,16 +21,23 @@ export default function AuthCard() {
 
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setErrMsg(null);
+    setInfoMsg(null);
+  }, [isLogin]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrMsg(null);
+    setInfoMsg(null);
     setLoading(true);
 
     try {
       if (isLogin) {
         await signIn(email, password);
-        console.log("Logged in!");
+         console.log("Logged in!");
       } else {
         const data = await signUp(email, password, name);
         console.log("SignUp result:", data?.user?.id, data?.user?.email);
@@ -107,6 +115,16 @@ export default function AuthCard() {
               {/* Optional: show basic error in console-only UI */}
               {errMsg && (
                 <span className="sr-only">{errMsg}</span>
+              )}
+              {errMsg && (
+                <p role = "alert" className = "text-sm text-red-600">
+                  {errMsg}
+                </p>
+              )}
+              {infoMsg && (
+                <p role = "status" className = "text-sm text-green-600">
+                  {infoMsg}
+                </p>
               )}
             </form>
           </CardContent>
