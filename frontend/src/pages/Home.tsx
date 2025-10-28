@@ -359,13 +359,41 @@ function ProfileSheet({
 
         <Tabs defaultValue="profile" className="w-full">
           <div className="px-4 pt-3">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="mine">My Recipes</TabsTrigger>
-              <TabsTrigger value="favorites">Favorites</TabsTrigger>
-              <TabsTrigger value="signout">Sign out</TabsTrigger>
-            </TabsList>
-          </div>
+  <TabsList
+    className="
+      grid w-full
+      [grid-template-columns:repeat(4,minmax(0,1fr))] /* equal, non-overflowing cols */
+      gap-2 p-1 bg-muted rounded-lg
+    "
+  >
+    {[
+      ["profile", "Profile"],
+      ["mine", "My Recipes"],
+      ["favorites", "Favorites"],
+      ["signout", "Sign out"],
+    ].map(([val, label]) => (
+      <TabsTrigger
+        key={val}
+        value={val}
+        className="
+  w-full min-w-0
+  min-h-10 py-2 px-2
+  inline-flex items-center justify-center text-center
+  rounded-md text-xs sm:text-sm leading-tight
+  break-words whitespace-normal
+  data-[state=active]:bg-primary
+  data-[state=active]:text-primary-foreground
+  data-[state=active]:font-semibold
+"
+      >
+        {label}
+      </TabsTrigger>
+    ))}
+  </TabsList>
+</div>
+
+
+
 
           <ScrollArea className="h-[calc(100dvh-140px)] px-4 py-3">
             {/* Profile tab */}
