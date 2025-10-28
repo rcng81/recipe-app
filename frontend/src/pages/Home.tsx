@@ -14,6 +14,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Recipe = {
   id: string;
@@ -149,9 +157,14 @@ export default function Home() {
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
+          {/* Avatar opens Profile Sheet */}
+          <ProfileSheet
+            initials={initials}
+            displayName={displayName ?? "Chef"}
+            onSignOut={handleSignOut}
+            onDisplayNameUpdated={setDisplayName}
+          />
+
           <div className="mr-auto">
             <p className="text-xs text-muted-foreground">Welcome back</p>
             <p className="text-sm font-medium">{displayName ?? "Chef"}</p>
@@ -240,53 +253,221 @@ export default function Home() {
         </section>
 
         <Separator />
+
         {/* Feed */}
         <section className="space-y-4">
-        <Tabs defaultValue="trending" className="w-full">
+          <Tabs defaultValue="trending" className="w-full">
             {/* Title + Tabs in one row */}
             <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Explore</h2>
-            <TabsList className="hidden md:inline-flex">
+              <h2 className="text-lg font-semibold">Explore</h2>
+              <TabsList className="hidden md:inline-flex">
                 <TabsTrigger value="trending" className="data-[state=active]:font-semibold">
-                Trending
+                  Trending
                 </TabsTrigger>
                 <TabsTrigger value="new" className="data-[state=active]:font-semibold">
-                New
+                  New
                 </TabsTrigger>
                 <TabsTrigger value="saved" className="data-[state=active]:font-semibold">
-                Saved
+                  Saved
                 </TabsTrigger>
-            </TabsList>
+              </TabsList>
             </div>
 
             {/* Mobile tabs list */}
             <TabsList className="md:hidden mt-2">
-            <TabsTrigger value="trending">Trending</TabsTrigger>
-            <TabsTrigger value="new">New</TabsTrigger>
-            <TabsTrigger value="saved">Saved</TabsTrigger>
+              <TabsTrigger value="trending">Trending</TabsTrigger>
+              <TabsTrigger value="new">New</TabsTrigger>
+              <TabsTrigger value="saved">Saved</TabsTrigger>
             </TabsList>
 
             <TabsContent value="trending" className="mt-4">
-            <RecipeGrid recipes={TRENDING} onOpen={(id) => navigate(`/recipe/${id}`)} />
+              <RecipeGrid recipes={TRENDING} onOpen={(id) => navigate(`/recipe/${id}`)} />
             </TabsContent>
 
             <TabsContent value="new" className="mt-4">
-            <RecipeGrid recipes={NEW_RECIPES} onOpen={(id) => navigate(`/recipe/${id}`)} />
+              <RecipeGrid recipes={NEW_RECIPES} onOpen={(id) => navigate(`/recipe/${id}`)} />
             </TabsContent>
 
             <TabsContent value="saved" className="mt-4">
-            <EmptyState
+              <EmptyState
                 title="No saved recipes yet"
                 description="Save recipes you love and they’ll show up here."
                 actionLabel="Browse recipes"
                 onAction={() => navigate("/search")}
-            />
+              />
             </TabsContent>
-        </Tabs>
+          </Tabs>
         </section>
-
       </main>
     </div>
+  );
+}
+
+/* ---------- Profile Sheet (opens from avatar) ---------- */
+
+function ProfileSheet({
+  initials,
+  displayName,
+  onSignOut,
+  onDisplayNameUpdated,
+}: {
+  initials: string;
+  displayName: string;
+  onSignOut: () => void;
+  onDisplayNameUpdated: (name: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [nameInput, setNameInput] = useState(displayName);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      if (!userRes.user) throw new Error("Not authenticated.");
+
+      const { error } = await supabase.auth.updateUser({
+        data: { name: nameInput.trim() || null },
+      });
+      if (error) throw error;
+
+      onDisplayNameUpdated(nameInput.trim() || null);
+      setMessage("Profile updated!");
+    } catch (err: any) {
+      setMessage(err.message ?? "Failed to update profile.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Avatar className="h-9 w-9 cursor-pointer">
+          <AvatarFallback>{initials}</AvatarFallback>
+        </Avatar>
+      </SheetTrigger>
+
+      <SheetContent side="left" className="w-[320px] p-0">
+        <SheetHeader className="px-4 pt-4 pb-2">
+          <SheetTitle className="text-left">Your Profile</SheetTitle>
+        </SheetHeader>
+        <Separator />
+
+        <Tabs defaultValue="profile" className="w-full">
+          <div className="px-4 pt-3">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="mine">My Recipes</TabsTrigger>
+              <TabsTrigger value="favorites">Favorites</TabsTrigger>
+              <TabsTrigger value="signout">Sign out</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <ScrollArea className="h-[calc(100dvh-140px)] px-4 py-3">
+            {/* Profile tab */}
+            <TabsContent value="profile" className="mt-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Account</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <form className="space-y-3" onSubmit={saveProfile}>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Display name</label>
+                      <Input
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        placeholder="Your name"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This shows in the app and is saved to your Supabase user metadata.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="submit" disabled={saving}>
+                        {saving ? "Saving..." : "Save changes"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setNameInput(displayName)}
+                        disabled={saving}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                    {message && (
+                      <p className="text-xs text-muted-foreground">{message}</p>
+                    )}
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* My Recipes tab */}
+            <TabsContent value="mine" className="mt-2">
+              <Card className="border-dashed">
+                <CardHeader>
+                  <CardTitle className="text-base">My Recipes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>You haven’t published any recipes yet.</p>
+                  <Button
+                    onClick={() => {
+                      // navigate to create page if you have one
+                      // navigate("/create");
+                    }}
+                    size="sm"
+                  >
+                    Create a recipe
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Favorites tab */}
+            <TabsContent value="favorites" className="mt-2">
+              <EmptyState
+                title="No favorites"
+                description="Tap the Save button on any recipe to add it here."
+                actionLabel="Explore recipes"
+                onAction={() => {
+                  // navigate to search
+                  // (You can't use useNavigate hook here easily; open the main search via location)
+                  window.location.href = "/search";
+                }}
+              />
+            </TabsContent>
+
+            {/* Sign out tab */}
+            <TabsContent value="signout" className="mt-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Sign out</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    You’ll be returned to the login screen.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      onSignOut();
+                    }}
+                  >
+                    Sign out
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
+      </SheetContent>
+    </Sheet>
   );
 }
 
