@@ -178,6 +178,14 @@ export default function Home() {
             />
             <Button type="submit">Search</Button>
           </form>
+          <Button className="hidden md:inline-flex" onClick={() => navigate("/create")}>
+            New recipe
+          </Button>
+          
+          {/*Mobile button display*/}
+          <Button size="icon" className="md:hidden" onClick={() => navigate("/create")}>
+            +
+          </Button>
 
           <Button variant="outline" className="ml-2" onClick={handleSignOut}>
             Sign out
@@ -202,8 +210,14 @@ export default function Home() {
                   name="q"
                   placeholder="Try “chicken”, “vegan pasta”, or “30 min dinner”"
                 />
-                <Button type="submit">Search</Button>
+                <div className="flex gap-2">
+                  <Button type="submit">Search</Button>
+                  <Button variant="secondary" type="button" onClick={() => window.location.href = "/create"}>
+                    Create a recipe
+                  </Button>
+                </div>
               </form>
+              
               <div className="flex flex-wrap gap-2">
                 <QuickTag tag="Pasta" />
                 <QuickTag tag="Vegetarian" />
@@ -442,8 +456,7 @@ function ProfileSheet({
                   <p>You haven’t published any recipes yet.</p>
                   <Button
                     onClick={() => {
-                      // navigate to create page if you have one
-                      // navigate("/create");
+                      window.location.href = "/create";
                     }}
                     size="sm"
                   >
