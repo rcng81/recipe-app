@@ -9,7 +9,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea"; // if you don't have this component, switch to a plain <textarea>
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -31,7 +31,6 @@ type StepItem = {
 export default function CreateRecipe() {
   const navigate = useNavigate();
 
-  // --- simple auth guard (like Home)
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -39,7 +38,6 @@ export default function CreateRecipe() {
     })();
   }, [navigate]);
 
-  // --- form state
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState<number | "">("");
   const [difficulty, setDifficulty] = useState<Difficulty>("Easy");
@@ -47,9 +45,9 @@ export default function CreateRecipe() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  const [ingredients, setIngredients] = useState<Ingredient[]>([
-    { id: crypto.randomUUID(), text: "" },
-  ]);
+  const [ingredientInput, setIngredientInput] = useState("");
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+
 
   const [steps, setSteps] = useState<StepItem[]>([
     { id: crypto.randomUUID(), text: "" },
@@ -63,18 +61,21 @@ export default function CreateRecipe() {
       title.trim().length > 2 &&
       typeof minutes === "number" &&
       minutes > 0 &&
-      ingredients.some((i) => i.text.trim().length > 0) &&
+      ingredients.length > 0 &&
       steps.some((s) => s.text.trim().length > 0)
     );
   }, [title, minutes, ingredients, steps]);
 
-  // --- helpers
-  function addIngredientRow() {
-    setIngredients((prev) => [...prev, { id: crypto.randomUUID(), text: "" }]);
+  function handleAddIngredient() {
+    const t = ingredientInput.trim();
+    if (!t) return;
+    setIngredients((prev) => [...prev, { id: crypto.randomUUID(), text: t }]);
+    setIngredientInput("");
   }
-  function removeIngredientRow(id: string) {
-    setIngredients((prev) => (prev.length > 1 ? prev.filter((i) => i.id !== id) : prev));
+  function handleRemoveIngredient(id: string) {
+    setIngredients((prev) => prev.filter((i) => i.id !== id));
   }
+
 
   function addStepRow() {
     setSteps((prev) => [...prev, { id: crypto.randomUUID(), text: "" }]);
@@ -104,7 +105,7 @@ export default function CreateRecipe() {
     const errs: string[] = [];
     if (title.trim().length < 3) errs.push("Title must be at least 3 characters.");
     if (typeof minutes !== "number" || minutes <= 0) errs.push("Minutes must be a positive number.");
-    if (!ingredients.some((i) => i.text.trim().length > 0)) errs.push("Add at least one ingredient.");
+    if (ingredients.length === 0) errs.push("Add at least one ingredient.");
     if (!steps.some((s) => s.text.trim().length > 0)) errs.push("Add at least one step.");
 
     if (errs.length > 0) {
@@ -114,7 +115,6 @@ export default function CreateRecipe() {
 
     setSubmitting(true);
     try {
-      // Construct payload for later Supabase insert
       const payload = {
         title: title.trim(),
         minutes,
@@ -237,41 +237,42 @@ export default function CreateRecipe() {
 
               {/* Ingredients */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base">Ingredients</Label>
-                  <Button type="button" size="sm" onClick={addIngredientRow}>
+                <Label className="text-base">Ingredients</Label>
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder='Type an ingredient and press "Add" (e.g., 200g spaghetti)'
+                    value={ingredientInput}
+                    onChange={(e) => setIngredientInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddIngredient();
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="secondary" onClick={handleAddIngredient}>
                     Add ingredient
                   </Button>
                 </div>
 
-                <div className="space-y-2">
-                  {ingredients.map((ing, idx) => (
-                    <div key={ing.id} className="flex items-center gap-2">
-                      <Input
-                        placeholder={idx === 0 ? "e.g., 200g spaghetti" : "Add ingredient"}
-                        value={ing.text}
-                        onChange={(e) =>
-                          setIngredients((prev) =>
-                            prev.map((it) =>
-                              it.id === ing.id ? { ...it, text: e.target.value } : it
-                            )
-                          )
-                        }
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeIngredientRow(ing.id)}
-                        aria-label="Remove ingredient"
-                        disabled={ingredients.length === 1}
+                {ingredients.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {ingredients.map((ing) => (
+                      <Badge
+                        key={ing.id}
+                        variant="secondary"
+                        className="cursor-pointer"
+                        onClick={() => handleRemoveIngredient(ing.id)}
+                        title="Click to remove"
                       >
-                        ✕
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                        {ing.text}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
+
 
               {/* Steps */}
               <div className="space-y-3">
