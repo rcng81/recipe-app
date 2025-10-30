@@ -14,7 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 
@@ -31,24 +37,38 @@ type StepItem = {
 export default function CreateRecipe() {
   const navigate = useNavigate();
 
+  // auth guard (simple)
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) navigate("/login");
     })();
   }, [navigate]);
 
+  // Form state
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState<number | "">("");
   const [difficulty, setDifficulty] = useState<Difficulty>("Easy");
-  const [imageUrl, setImageUrl] = useState("");
+
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const previewUrl = useMemo(() => {
+    if (!imageFile) return "";
+    return URL.createObjectURL(imageFile);
+  }, [imageFile]);
+
+  // Tags
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  const [ingredientInput, setIngredientInput] = useState("");
+  // Ingredients (chip-style add)
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [ingredientInput, setIngredientInput] = useState("");
 
-
+  // Steps (rich list)
   const [steps, setSteps] = useState<StepItem[]>([
     { id: crypto.randomUUID(), text: "" },
   ]);
@@ -61,29 +81,12 @@ export default function CreateRecipe() {
       title.trim().length > 2 &&
       typeof minutes === "number" &&
       minutes > 0 &&
-      ingredients.length > 0 &&
-      steps.some((s) => s.text.trim().length > 0)
+      (ingredients.length > 0 ||
+        steps.some((s) => s.text.trim().length > 0)) // at least something meaningful
     );
   }, [title, minutes, ingredients, steps]);
 
-  function handleAddIngredient() {
-    const t = ingredientInput.trim();
-    if (!t) return;
-    setIngredients((prev) => [...prev, { id: crypto.randomUUID(), text: t }]);
-    setIngredientInput("");
-  }
-  function handleRemoveIngredient(id: string) {
-    setIngredients((prev) => prev.filter((i) => i.id !== id));
-  }
-
-
-  function addStepRow() {
-    setSteps((prev) => [...prev, { id: crypto.randomUUID(), text: "" }]);
-  }
-  function removeStepRow(id: string) {
-    setSteps((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
-  }
-
+  // --- Tag handlers ---
   function handleAddTag() {
     const t = tagInput.trim();
     if (!t) return;
@@ -98,15 +101,35 @@ export default function CreateRecipe() {
     setTags((prev) => prev.filter((t) => t !== tag));
   }
 
+  // --- Ingredient (chip) handlers ---
+  function handleAddIngredient() {
+    const val = ingredientInput.trim();
+    if (!val) return;
+    setIngredients((prev) => [...prev, { id: crypto.randomUUID(), text: val }]);
+    setIngredientInput("");
+  }
+  function handleRemoveIngredient(id: string) {
+    setIngredients((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  // --- Step handlers ---
+  function addStepRow() {
+    setSteps((prev) => [...prev, { id: crypto.randomUUID(), text: "" }]);
+  }
+  function removeStepRow(id: string) {
+    setSteps((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrors([]);
 
     const errs: string[] = [];
     if (title.trim().length < 3) errs.push("Title must be at least 3 characters.");
-    if (typeof minutes !== "number" || minutes <= 0) errs.push("Minutes must be a positive number.");
-    if (ingredients.length === 0) errs.push("Add at least one ingredient.");
-    if (!steps.some((s) => s.text.trim().length > 0)) errs.push("Add at least one step.");
+    if (typeof minutes !== "number" || minutes <= 0)
+      errs.push("Minutes must be a positive number.");
+    if (ingredients.length === 0 && !steps.some((s) => s.text.trim().length > 0))
+      errs.push("Add at least one ingredient or one step.");
 
     if (errs.length > 0) {
       setErrors(errs);
@@ -115,34 +138,90 @@ export default function CreateRecipe() {
 
     setSubmitting(true);
     try {
+      // Get user id
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData?.user) throw new Error("Not authenticated.");
+      const userId = userData.user.id;
+
+      // Upload image if present
+      let uploadedUrl: string | null = null;
+      if (imageFile) {
+        setUploading(true);
+        const ext = imageFile.name.split(".").pop() || "jpg";
+        const fileName = `${crypto.randomUUID()}.${ext}`;
+        const filePath = `recipes/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("images") // BUCKET NAME (created in step B)
+          .upload(filePath, imageFile, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("images")
+          .getPublicUrl(filePath);
+
+        uploadedUrl = publicUrlData.publicUrl;
+        setUploading(false);
+      }
+
+      // Build payload
       const payload = {
         title: title.trim(),
         minutes,
         difficulty,
-        image: imageUrl.trim() || null,
+        image: uploadedUrl,
         tags,
-        ingredients: ingredients
-          .map((i) => i.text.trim())
-          .filter((t) => t.length > 0),
+        ingredients: ingredients.map((i) => i.text.trim()).filter(Boolean),
         steps: steps
           .map((s, idx) => ({ order: idx + 1, text: s.text.trim() }))
           .filter((s) => s.text.length > 0),
         created_at: new Date().toISOString(),
       };
+      console.log("Testing Supabase insert...");
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log("SESSION USER:", sessionData?.session?.user?.id);
 
-      // TODO: Replace this with a Supabase insert when your table is ready.
-      // Example:
-      // const { data, error } = await supabase
-      //   .from("recipes")
-      //   .insert(payload)
-      //   .select()
-      //   .single();
-      // if (error) throw error;
-      // navigate(`/recipe/${data.id}`);
+      const { data: s } = await supabase.auth.getSession();
+      const uid = s?.session?.user?.id;
+      if (!uid) {
+        setErrors(["You must be signed in."]);
+        setSubmitting(false);
+        return;
+      }
 
-      console.log("SUBMIT RECIPE PAYLOAD:", payload);
-      // For now, just go back home (or to a preview route if you add one)
-      navigate("/");
+      // Upsert profile row (id must equal auth.uid())
+      const { error: upsertProfileErr } = await supabase
+        .from("profiles")
+        .upsert({ id: uid }, { onConflict: "id" });
+      if (upsertProfileErr) {
+        setErrors([`Profile setup failed: ${upsertProfileErr.message}`]);
+        setSubmitting(false);
+        return;
+      }
+
+
+  // Insert the real recipe (no more "RLS Smoke Test")
+  const { data, error } = await supabase
+    .from("recipes")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("❌ Insert failed:", error.message);
+    setErrors([error.message]);
+    setSubmitting(false);
+    return;
+  }
+
+console.log("✅ Insert succeeded:", data);
+
+// If you DON'T have a /recipe/:id page yet, go home for now:
+navigate("/");
     } catch (err: any) {
       setErrors([err?.message ?? "Failed to create recipe."]);
     } finally {
@@ -161,8 +240,8 @@ export default function CreateRecipe() {
                 <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!canSubmit || submitting}>
-                  {submitting ? "Saving..." : "Publish"}
+                <Button type="submit" disabled={!canSubmit || submitting || uploading}>
+                  {submitting ? "Saving..." : uploading ? "Uploading..." : "Publish"}
                 </Button>
               </div>
             </CardHeader>
@@ -179,7 +258,7 @@ export default function CreateRecipe() {
                 />
               </div>
 
-              {/* Meta (minutes + difficulty) */}
+              {/* Meta */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="minutes">Minutes</Label>
@@ -212,22 +291,24 @@ export default function CreateRecipe() {
                 </div>
               </div>
 
-              {/* Image URL (simple for now) */}
+              {/* Image upload */}
               <div className="space-y-2">
-                <Label htmlFor="image">Image URL (optional)</Label>
+                <Label htmlFor="image-file">Upload image (optional)</Label>
                 <Input
-                  id="image"
-                  placeholder="Paste an image URL or leave blank"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  id="image-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setImageFile(file);
+                  }}
                 />
-                {imageUrl && (
+                {previewUrl && (
                   <div className="mt-2 overflow-hidden rounded-md border">
                     <img
-                      src={imageUrl}
-                      alt="Recipe preview"
+                      src={previewUrl}
+                      alt="Preview"
                       className="w-full h-48 object-cover"
-                      onError={() => {/* ignore preview errors */}}
                     />
                   </div>
                 )}
@@ -235,10 +316,9 @@ export default function CreateRecipe() {
 
               <Separator />
 
-              {/* Ingredients */}
-              <div className="space-y-3">
+              {/* Ingredients (chip add) */}
+              <div className="space-y-2">
                 <Label className="text-base">Ingredients</Label>
-
                 <div className="flex gap-2">
                   <Input
                     placeholder='Type an ingredient and press "Add" (e.g., 200g spaghetti)'
@@ -251,11 +331,10 @@ export default function CreateRecipe() {
                       }
                     }}
                   />
-                  <Button type="button" variant="secondary" onClick={handleAddIngredient}>
-                    Add ingredient
+                  <Button type="button" onClick={handleAddIngredient}>
+                    Add
                   </Button>
                 </div>
-
                 {ingredients.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-1">
                     {ingredients.map((ing) => (
@@ -272,7 +351,6 @@ export default function CreateRecipe() {
                   </div>
                 )}
               </div>
-
 
               {/* Steps */}
               <div className="space-y-3">
@@ -370,8 +448,8 @@ export default function CreateRecipe() {
               <Button type="button" variant="ghost" onClick={() => navigate(-1)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!canSubmit || submitting}>
-                {submitting ? "Saving..." : "Publish"}
+              <Button type="submit" disabled={!canSubmit || submitting || uploading}>
+                {submitting ? "Saving..." : uploading ? "Uploading..." : "Publish"}
               </Button>
             </CardFooter>
           </Card>
