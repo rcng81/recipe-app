@@ -32,70 +32,31 @@ type Recipe = {
   tags: string[];
 };
 
-const TRENDING: Recipe[] = [
-  {
-    id: "1",
-    title: "Creamy Garlic Pasta",
-    minutes: 20,
-    difficulty: "Easy",
-    image:
-      "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?auto=format&fit=crop&w=1200&q=80",
-    tags: ["Pasta", "Comfort"],
-  },
-  {
-    id: "2",
-    title: "Neapolitan Pizza",
-    minutes: 30,
-    difficulty: "Medium",
-    image:
-      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
-    tags: ["Italian", "Bake"],
-  },
-  {
-    id: "3",
-    title: "Sushi Night Platter",
-    minutes: 25,
-    difficulty: "Medium",
-    image:
-      "https://images.unsplash.com/photo-1606851093080-ea44e36f7b31?auto=format&fit=crop&w=1200&q=80",
-    tags: ["Seafood", "Rice"],
-  },
-];
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1400&q=80";
 
-const NEW_RECIPES: Recipe[] = [
-  {
-    id: "4",
-    title: "Farmer’s Market Salad",
-    minutes: 12,
-    difficulty: "Easy",
-    image:
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80",
-    tags: ["Salad", "Fresh"],
-  },
-  {
-    id: "5",
-    title: "Pancakes & Berries",
-    minutes: 15,
-    difficulty: "Easy",
-    image:
-      "https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=1200&q=80",
-    tags: ["Breakfast", "Sweet"],
-  },
-  {
-    id: "6",
-    title: "Seared Steak Plate",
-    minutes: 22,
-    difficulty: "Medium",
-    image:
-      "https://images.unsplash.com/photo-1523983302122-73e56a1c6b9a?auto=format&fit=crop&w=1200&q=80",
-    tags: ["Dinner", "Protein"],
-  },
-];
 
 export default function Home() {
   const navigate = useNavigate();
   const [loadingUser, setLoadingUser] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+
+  const [latest, setLatest] = useState<Recipe[]>([]);
+  const [trending, setTrending] = useState<Recipe[]>([]);
+  const [loadingFeed, setLoadingFeed] = useState(true);
+  const [feedError, setFeedError] = useState<string | null>(null);
+
+  function mapRowToRecipe(row: any): Recipe {
+    return {
+      id: row.id,
+      title: row.title,
+      minutes: row.minutes,
+      difficulty: row.difficulty as Recipe["difficulty"],
+      image: row.image || PLACEHOLDER_IMAGE,
+      tags: row.tags ?? [],
+    };
+  }
+
 
   useEffect(() => {
     let mounted = true;
@@ -116,7 +77,32 @@ export default function Home() {
       if (mounted) {
         setDisplayName(name);
         setLoadingUser(false);
+
+        // ---- Fetch feed once we know the user is signed in ----
+        setLoadingFeed(true);
+        setFeedError(null);
+        try {
+          // "New" = latest recipes
+          const { data: latestRows, error: latestErr } = await supabase
+            .from("recipes")
+            .select("id, title, minutes, difficulty, image, tags, created_at")
+            .order("created_at", { ascending: false })
+            .limit(12);
+
+          if (latestErr) throw latestErr;
+
+          const latestMapped = (latestRows ?? []).map(mapRowToRecipe);
+          setLatest(latestMapped);
+
+          // For now, "Trending" can be the same set (until you add likes/views)
+          setTrending(latestMapped);
+        } catch (err: any) {
+          setFeedError(err.message ?? "Failed to load recipes.");
+        } finally {
+          setLoadingFeed(false);
+        }
       }
+
     })();
     return () => {
       mounted = false;
@@ -295,11 +281,47 @@ export default function Home() {
             </TabsList>
 
             <TabsContent value="trending" className="mt-4">
-              <RecipeGrid recipes={TRENDING} onOpen={(id) => navigate(`/recipe/${id}`)} />
+              {loadingFeed ? (
+                <span className="text-sm text-muted-foreground">Loading recipes…</span>
+              ) : feedError ? (
+                <EmptyState
+                  title="Couldn’t load recipes"
+                  description={feedError}
+                  actionLabel="Retry"
+                  onAction={() => window.location.reload()}
+                />
+              ) : trending.length === 0 ? (
+                <EmptyState
+                  title="No recipes yet"
+                  description="Be the first to add one!"
+                  actionLabel="Create a recipe"
+                  onAction={() => navigate("/create")}
+                />
+              ) : (
+                <RecipeGrid recipes={trending} onOpen={(id) => navigate(`/recipe/${id}`)} />
+              )}
             </TabsContent>
 
             <TabsContent value="new" className="mt-4">
-              <RecipeGrid recipes={NEW_RECIPES} onOpen={(id) => navigate(`/recipe/${id}`)} />
+              {loadingFeed ? (
+                <span className="text-sm text-muted-foreground">Loading recipes…</span>
+              ) : feedError ? (
+                <EmptyState
+                  title="Couldn’t load recipes"
+                  description={feedError}
+                  actionLabel="Retry"
+                  onAction={() => window.location.reload()}
+                />
+              ) : latest.length === 0 ? (
+                <EmptyState
+                  title="No recent recipes"
+                  description="Try again later or publish one now."
+                  actionLabel="Create a recipe"
+                  onAction={() => navigate("/create")}
+                />
+              ) : (
+                <RecipeGrid recipes={latest} onOpen={(id) => navigate(`/recipe/${id}`)} />
+              )}
             </TabsContent>
 
             <TabsContent value="saved" className="mt-4">
@@ -310,6 +332,7 @@ export default function Home() {
                 onAction={() => navigate("/search")}
               />
             </TabsContent>
+
           </Tabs>
         </section>
       </main>
