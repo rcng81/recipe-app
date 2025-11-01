@@ -20,6 +20,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -30,11 +31,11 @@ type Recipe = {
   difficulty: "Easy" | "Medium" | "Hard";
   image: string;
   tags: string[];
+  created_at?: string;
 };
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1400&q=80";
-
 
 export default function Home() {
   const navigate = useNavigate();
@@ -54,9 +55,9 @@ export default function Home() {
       difficulty: row.difficulty as Recipe["difficulty"],
       image: row.image || PLACEHOLDER_IMAGE,
       tags: row.tags ?? [],
+      created_at: row.created_at,
     };
   }
-
 
   useEffect(() => {
     let mounted = true;
@@ -74,27 +75,22 @@ export default function Home() {
         (session.user.user_metadata?.name as string | undefined) ??
         session.user.email?.split("@")[0] ??
         null;
+
       if (mounted) {
         setDisplayName(name);
         setLoadingUser(false);
-
-        // ---- Fetch feed once we know the user is signed in ----
         setLoadingFeed(true);
         setFeedError(null);
         try {
-          // "New" = latest recipes
           const { data: latestRows, error: latestErr } = await supabase
             .from("recipes")
             .select("id, title, minutes, difficulty, image, tags, created_at")
             .order("created_at", { ascending: false })
             .limit(12);
-
           if (latestErr) throw latestErr;
 
           const latestMapped = (latestRows ?? []).map(mapRowToRecipe);
           setLatest(latestMapped);
-
-          // For now, "Trending" can be the same set (until you add likes/views)
           setTrending(latestMapped);
         } catch (err: any) {
           setFeedError(err.message ?? "Failed to load recipes.");
@@ -102,7 +98,6 @@ export default function Home() {
           setLoadingFeed(false);
         }
       }
-
     })();
     return () => {
       mounted = false;
@@ -126,7 +121,6 @@ export default function Home() {
     const formData = new FormData(e.currentTarget);
     const q = (formData.get("q") as string)?.trim();
     if (!q) return;
-
     navigate(`/search?q=${encodeURIComponent(q)}`);
   }
 
@@ -167,7 +161,7 @@ export default function Home() {
           <Button className="hidden md:inline-flex" onClick={() => navigate("/create")}>
             New recipe
           </Button>
-          
+
           {/*Mobile button display*/}
           <Button size="icon" className="md:hidden" onClick={() => navigate("/create")}>
             +
@@ -198,12 +192,16 @@ export default function Home() {
                 />
                 <div className="flex gap-2">
                   <Button type="submit">Search</Button>
-                  <Button variant="secondary" type="button" onClick={() => window.location.href = "/create"}>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => (window.location.href = "/create")}
+                  >
                     Create a recipe
                   </Button>
                 </div>
               </form>
-              
+
               <div className="flex flex-wrap gap-2">
                 <QuickTag tag="Pasta" />
                 <QuickTag tag="Vegetarian" />
@@ -332,15 +330,12 @@ export default function Home() {
                 onAction={() => navigate("/search")}
               />
             </TabsContent>
-
           </Tabs>
         </section>
       </main>
     </div>
   );
 }
-
-/* ---------- Profile Sheet (opens from avatar) ---------- */
 
 function ProfileSheet({
   initials,
@@ -357,6 +352,53 @@ function ProfileSheet({
   const [saving, setSaving] = useState(false);
   const [nameInput, setNameInput] = useState(displayName);
   const [message, setMessage] = useState<string | null>(null);
+
+  // --- My Recipes state ---
+  const [tab, setTab] = useState<"profile" | "mine" | "favorites" | "signout">("profile");
+  const [myRecipes, setMyRecipes] = useState<Recipe[]>([]);
+  const [loadingMine, setLoadingMine] = useState(false);
+  const [mineError, setMineError] = useState<string | null>(null);
+
+  function mapRowToRecipe(row: any): Recipe {
+    return {
+      id: row.id,
+      title: row.title,
+      minutes: row.minutes,
+      difficulty: row.difficulty as Recipe["difficulty"],
+      image: row.image || PLACEHOLDER_IMAGE,
+      tags: row.tags ?? [],
+      created_at: row.created_at,
+    };
+  }
+
+  async function loadMyRecipes() {
+    setLoadingMine(true);
+    setMineError(null);
+    try {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      const uid = userRes.user?.id;
+      if (!uid) throw new Error("Not authenticated.");
+
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("id, title, minutes, difficulty, image, tags, created_at, author_id")
+        .eq("author_id", uid)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setMyRecipes((data ?? []).map(mapRowToRecipe));
+    } catch (err: any) {
+      setMineError(err.message ?? "Failed to load your recipes.");
+    } finally {
+      setLoadingMine(false);
+    }
+  }
+  useEffect(() => {
+    if (open && tab === "mine") {
+      loadMyRecipes();
+    }
+  }, [open, tab]);
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -391,10 +433,18 @@ function ProfileSheet({
       <SheetContent side="left" className="w-[320px] p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
           <SheetTitle className="text-left">Your Profile</SheetTitle>
+          <SheetDescription className="sr-only">
+            Manage your account, view your recipes, favorites, and sign out.
+          </SheetDescription>
         </SheetHeader>
         <Separator />
 
-        <Tabs defaultValue="profile" className="w-full">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as typeof tab)}
+          defaultValue="profile"
+          className="w-full"
+        >
           <div className="px-4 pt-3">
             <TabsList
               className="
@@ -413,21 +463,22 @@ function ProfileSheet({
                   key={val}
                   value={val}
                   className="
-            w-full min-w-0
-            min-h-12 py-2 px-3
-            inline-flex items-center justify-center text-center
-            rounded-md text-xs sm:text-sm leading-snug
-            break-words whitespace-normal
-            data-[state=active]:bg-primary
-            data-[state=active]:text-primary-foreground
-            data-[state=active]:font-semibold
-          "
+                    w-full min-w-0
+                    min-h-12 py-2 px-3
+                    inline-flex items-center justify-center text-center
+                    rounded-md text-xs sm:text-sm leading-snug
+                    break-words whitespace-normal
+                    data-[state=active]:bg-primary
+                    data-[state=active]:text-primary-foreground
+                    data-[state=active]:font-semibold
+                  "
                 >
                   {label}
                 </TabsTrigger>
               ))}
             </TabsList>
           </div>
+
           <ScrollArea className="h-[calc(100dvh-140px)] px-4 py-3">
             {/* Profile tab */}
             <TabsContent value="profile" className="mt-2">
@@ -471,22 +522,46 @@ function ProfileSheet({
 
             {/* My Recipes tab */}
             <TabsContent value="mine" className="mt-2">
-              <Card className="border-dashed">
-                <CardHeader>
-                  <CardTitle className="text-base">My Recipes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p>You haven’t published any recipes yet.</p>
-                  <Button
-                    onClick={() => {
-                      window.location.href = "/create";
-                    }}
-                    size="sm"
-                  >
-                    Create a recipe
-                  </Button>
-                </CardContent>
-              </Card>
+              {loadingMine ? (
+                <span className="text-sm text-muted-foreground">Loading your recipes…</span>
+              ) : mineError ? (
+                <EmptyState
+                  title="Couldn’t load your recipes"
+                  description={mineError}
+                  actionLabel="Retry"
+                  onAction={loadMyRecipes}
+                />
+              ) : myRecipes.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardHeader>
+                    <CardTitle className="text-base">My Recipes</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm text-muted-foreground">
+                    <p>You haven’t published any recipes yet.</p>
+                    <Button
+                      onClick={() => {
+                        window.location.href = "/create";
+                      }}
+                      size="sm"
+                    >
+                      Create a recipe
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">My Recipes</h3>
+                    <Button variant="ghost" size="sm" onClick={loadMyRecipes}>
+                      Refresh
+                    </Button>
+                  </div>
+                  <MyRecipeList
+                    recipes={myRecipes}
+                    onOpen={(id) => (window.location.href = `/recipe/${id}`)}
+                  />
+                </div>
+              )}
             </TabsContent>
 
             {/* Favorites tab */}
@@ -569,7 +644,7 @@ function RecipeCard({
 }) {
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <div className="aspect-[16/10] w-full overflow-hidden">
+    <div className="aspect-[16/10] w-full overflow-hidden">
         <img
           src={recipe.image}
           alt={recipe.title}
@@ -603,6 +678,47 @@ function RecipeCard({
         <Button variant="ghost">Save</Button>
       </CardFooter>
     </Card>
+  );
+}
+
+function MyRecipeList({
+  recipes,
+  onOpen,
+}: {
+  recipes: Recipe[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-md border">
+      <div className="grid grid-cols-[1fr_auto] gap-2 px-3 py-2 text-xs text-muted-foreground">
+        <span>Title</span>
+        <span>Created</span>
+      </div>
+      <div className="divide-y">
+        {recipes.map((r) => (
+          <div
+            key={r.id}
+            className="grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2"
+          >
+            <button
+              className="text-left truncate font-medium hover:underline"
+              onClick={() => onOpen(r.id)}
+              title={r.title}
+            >
+              {r.title}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => onOpen(r.id)}>
+                View
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
