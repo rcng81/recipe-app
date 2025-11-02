@@ -39,7 +39,7 @@ export async function likeRecipe(recipeId: string): Promise<void> {
     .from("recipe_likes")
     .insert({ user_id: userId, recipe_id: recipeId });
 
-  if (error && error.code !== "23505") { // duplicate like safe-guard
+  if (error && error.code !== "23505") {
     throw error;
   }
 }

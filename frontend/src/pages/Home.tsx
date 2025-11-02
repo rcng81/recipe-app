@@ -400,6 +400,10 @@ function ProfileSheet({
   const [loadingMine, setLoadingMine] = useState(false);
   const [mineError, setMineError] = useState<string | null>(null);
 
+  const [favorites, setFavorites] = useState<Recipe[]>([]);
+  const [loadingFavs, setLoadingFavs] = useState(false);
+  const [favError, setFavError] = useState<string | null>(null);
+
   function mapRowToRecipe(row: any): Recipe {
     return {
       id: row.id,
@@ -440,6 +444,71 @@ function ProfileSheet({
       loadMyRecipes();
     }
   }, [open, tab]);
+
+  async function loadFavorites() {
+  setLoadingFavs(true);
+  setFavError(null);
+  try {
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    const uid = userRes.user?.id;
+    if (!uid) throw new Error("Not authenticated.");
+
+    const { data: likeRows, error: likeErr } = await supabase
+  .from("recipe_likes")
+  .select("recipe_id")
+  .eq("user_id", uid);
+
+
+    if (likeErr) throw likeErr;
+
+    const ids = (likeRows ?? []).map((r) => r.recipe_id);
+    if (ids.length === 0) {
+      setFavorites([]);
+      return;
+    }
+
+    // 2) Fetch those recipes
+    const { data: recipeRows, error: recipeErr } = await supabase
+      .from("recipes")
+      .select("id, title, minutes, difficulty, image, tags, created_at")
+      .in("id", ids)
+      .order("created_at", { ascending: false });
+
+    if (recipeErr) throw recipeErr;
+
+    const mapped = (recipeRows ?? []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      minutes: row.minutes,
+      difficulty: row.difficulty as Recipe["difficulty"],
+      image: row.image || PLACEHOLDER_IMAGE,
+      tags: row.tags ?? [],
+      created_at: row.created_at,
+    }));
+    setFavorites(mapped);
+  } catch (err: any) {
+    setFavError(err.message ?? "Failed to load favorites.");
+  } finally {
+    setLoadingFavs(false);
+  }
+}
+
+  useEffect(() => {
+  if (open && tab === "favorites") {
+    loadFavorites();
+  }
+}, [open, tab]);
+
+useEffect(() => {
+  const handler = () => {
+    if (open && tab === "favorites") {
+      loadFavorites();
+    }
+  };
+  window.addEventListener("likes-changed", handler);
+  return () => window.removeEventListener("likes-changed", handler);
+}, [open, tab]);
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -498,50 +567,48 @@ function ProfileSheet({
           {/* Triggers */}
           <div className="px-4 pt-3">
             <TabsList
-  className="
-    relative grid w-full h-full
-    [grid-template-columns:repeat(4,minmax(0,1fr))]
-    gap-2
-    p-1 rounded-md
-    bg-muted
-  "
->
-  {([
-    ["profile", "Profile"],
-    ["mine", "My Recipes"],
-    ["favorites", "Favorites"],
-    ["signout", "Sign out"],
-  ] as const).map(([val, label]) => {
-    const isActive = tab === val;
-    return (
-      <div key={val} className="relative">
-        {/* Active pill */}
-        {isActive && (
-          <motion.div
-            layoutId="profile-tabs-pill"
-            className="absolute inset-0 rounded-md bg-background shadow-sm"
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          />
-        )}
+              className="
+                relative grid w-full h-full
+                [grid-template-columns:repeat(4,minmax(0,1fr))]
+                gap-2
+                p-1 rounded-md
+                bg-muted
+              "
+            >
+              {([
+                ["profile", "Profile"],
+                ["mine", "My Recipes"],
+                ["favorites", "Favorites"],
+                ["signout", "Sign out"],
+              ] as const).map(([val, label]) => {
+                const isActive = tab === val;
+                return (
+                  <div key={val} className="relative">
+                    {/* Active pill */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="profile-tabs-pill"
+                        className="absolute inset-0 rounded-md bg-background shadow-sm"
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                      />
+                    )}
 
-        <TabsTrigger
-          value={val}
-          className={`
-            relative w-full z-10
-            min-h-10 py-2 px-3 rounded-md
-            text-xs sm:text-sm leading-snug
-            transition-colors
-            ${isActive ? "text-foreground" : "text-muted-foreground"}
-          `}
-        >
-          {label}
-        </TabsTrigger>
-      </div>
-    );
-  })}
-</TabsList>
-
-
+                    <TabsTrigger
+                      value={val}
+                      className={`
+                        relative w-full z-10
+                        min-h-10 py-2 px-3 rounded-md
+                        text-xs sm:text-sm leading-snug
+                        transition-colors
+                        ${isActive ? "text-foreground" : "text-muted-foreground"}
+                      `}
+                    >
+                      {label}
+                    </TabsTrigger>
+                  </div>
+                );
+              })}
+            </TabsList>
           </div>
 
           {/* Animated panels */}
@@ -634,17 +701,52 @@ function ProfileSheet({
               )}
 
               {tab === "favorites" && (
-                <motion.div key="favorites" {...panelMotion}>
+              <motion.div key="favorites" {...panelMotion}>
+                {loadingFavs ? (
+                  <span className="text-sm text-muted-foreground">Loading favorites…</span>
+                ) : favError ? (
                   <EmptyState
-                    title="No favorites"
-                    description="Tap the Save button on any recipe to add it here."
-                    actionLabel="Explore recipes"
-                    onAction={() => {
-                      window.location.href = "/search";
-                    }}
+                    title="Couldn’t load favorites"
+                    description={favError}
+                    actionLabel="Retry"
+                    onAction={loadFavorites}
                   />
-                </motion.div>
-              )}
+                ) : favorites.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardHeader>
+                      <CardTitle className="text-base">Favorites</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
+                      <p>No favorites yet. Tap the heart on any recipe to add it here.</p>
+                      <Button
+                        onClick={() => {
+                          window.location.href = "/search";
+                        }}
+                        size="sm"
+                        variant="secondary"
+                      >
+                        Explore recipes
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Favorites</h3>
+                      <Button variant="ghost" size="sm" onClick={loadFavorites}>
+                        Refresh
+                      </Button>
+                    </div>
+                    {/* Reuse your compact list UI */}
+                    <MyRecipeList
+                      recipes={favorites}
+                      onOpen={(id) => (window.location.href = `/recipe/${id}`)}
+                    />
+                  </div>
+                )}
+              </motion.div>
+            )}
+
 
               {tab === "signout" && (
                 <motion.div key="signout" {...panelMotion}>
@@ -719,7 +821,6 @@ function RecipeGrid({
   );
 }
 
-// make this a file-scope component (not inside Home)
 function LikeButton({
   liked,
   onPress,
@@ -729,7 +830,6 @@ function LikeButton({
   onPress: () => void;
   count?: number | null;
 }) {
-  // Little “burst” positions
   const BURST = [
     { x: 0, y: -12 }, { x: 10, y: -8 }, { x: 12, y: 0 }, { x: 10, y: 8 },
     { x: 0, y: 12 }, { x: -10, y: 8 }, { x: -12, y: 0 }, { x: -10, y: -8 },
@@ -764,7 +864,6 @@ function LikeButton({
         </span>
       </motion.span>
 
-      {/* Optional count */}
       {typeof count === "number" && (
         <span className="text-xs tabular-nums">{count}</span>
       )}
@@ -806,7 +905,6 @@ function RecipeCard({
   recipe: Recipe;
   onOpen: (id: string) => void;
 }) {
-  // hook to read & toggle like state for this recipe
   const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
 
   return (
@@ -820,7 +918,6 @@ function RecipeCard({
       className="group"
     >
       <Card className="overflow-hidden transition-shadow group-hover:shadow-lg">
-        {/* Shared element for image (pairs with RecipeDetail) */}
         <motion.div
           layoutId={`image-${recipe.id}`}
           className="aspect-[16/10] w-full overflow-hidden"
