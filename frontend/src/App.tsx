@@ -6,7 +6,6 @@ import CreateRecipe from "@/pages/CreateRecipe";
 import RecipeDetail from "@/pages/RecipeDetail";
 
 function RouteContainer({ children }: { children: React.ReactNode }) {
-  // Subtle page transition
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}

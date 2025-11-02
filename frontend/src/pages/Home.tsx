@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { motion, AnimatePresence, easeOut } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -46,6 +47,9 @@ export default function Home() {
   const [trending, setTrending] = useState<Recipe[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
+
+  const [tabValue, setTabValue] = useState<"trending" | "new" | "saved">("trending");
+  const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
   function mapRowToRecipe(row: any): Recipe {
     return {
@@ -254,84 +258,118 @@ export default function Home() {
 
         {/* Feed */}
         <section className="space-y-4">
-          <Tabs defaultValue="trending" className="w-full">
-            {/* Title + Tabs in one row */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Explore</h2>
-              <TabsList className="hidden md:inline-flex">
-                <TabsTrigger value="trending" className="data-[state=active]:font-semibold">
-                  Trending
-                </TabsTrigger>
-                <TabsTrigger value="new" className="data-[state=active]:font-semibold">
-                  New
-                </TabsTrigger>
-                <TabsTrigger value="saved" className="data-[state=active]:font-semibold">
-                  Saved
-                </TabsTrigger>
-              </TabsList>
-            </div>
+  <Tabs
+    value={tabValue}
+    onValueChange={(v) => setTabValue(v as typeof tabValue)}
+    className="w-full"
+  >
+    {/* Title + Tabs in one row */}
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-semibold">Explore</h2>
+      <TabsList className="hidden md:inline-flex">
+        <TabsTrigger value="trending" className="data-[state=active]:font-semibold">
+          Trending
+        </TabsTrigger>
+        <TabsTrigger value="new" className="data-[state=active]:font-semibold">
+          New
+        </TabsTrigger>
+        <TabsTrigger value="saved" className="data-[state=active]:font-semibold">
+          Saved
+        </TabsTrigger>
+      </TabsList>
+    </div>
 
-            {/* Mobile tabs list */}
-            <TabsList className="md:hidden mt-2">
-              <TabsTrigger value="trending">Trending</TabsTrigger>
-              <TabsTrigger value="new">New</TabsTrigger>
-              <TabsTrigger value="saved">Saved</TabsTrigger>
-            </TabsList>
+    {/* Mobile tabs list */}
+    <TabsList className="md:hidden mt-2">
+      <TabsTrigger value="trending">Trending</TabsTrigger>
+      <TabsTrigger value="new">New</TabsTrigger>
+      <TabsTrigger value="saved">Saved</TabsTrigger>
+    </TabsList>
 
-            <TabsContent value="trending" className="mt-4">
-              {loadingFeed ? (
-                <span className="text-sm text-muted-foreground">Loading recipes…</span>
-              ) : feedError ? (
-                <EmptyState
-                  title="Couldn’t load recipes"
-                  description={feedError}
-                  actionLabel="Retry"
-                  onAction={() => window.location.reload()}
-                />
-              ) : trending.length === 0 ? (
-                <EmptyState
-                  title="No recipes yet"
-                  description="Be the first to add one!"
-                  actionLabel="Create a recipe"
-                  onAction={() => navigate("/create")}
-                />
-              ) : (
-                <RecipeGrid recipes={trending} onOpen={(id) => navigate(`/recipe/${id}`)} />
-              )}
-            </TabsContent>
-
-            <TabsContent value="new" className="mt-4">
-              {loadingFeed ? (
-                <span className="text-sm text-muted-foreground">Loading recipes…</span>
-              ) : feedError ? (
-                <EmptyState
-                  title="Couldn’t load recipes"
-                  description={feedError}
-                  actionLabel="Retry"
-                  onAction={() => window.location.reload()}
-                />
-              ) : latest.length === 0 ? (
-                <EmptyState
-                  title="No recent recipes"
-                  description="Try again later or publish one now."
-                  actionLabel="Create a recipe"
-                  onAction={() => navigate("/create")}
-                />
-              ) : (
-                <RecipeGrid recipes={latest} onOpen={(id) => navigate(`/recipe/${id}`)} />
-              )}
-            </TabsContent>
-
-            <TabsContent value="saved" className="mt-4">
+    {/* Animated content area */}
+    <div className="mt-4 min-h-[260px]">
+      <AnimatePresence mode="wait">
+        {tabValue === "trending" && (
+          <motion.div
+            key="trending"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: EASE_OUT }}
+          >
+            {loadingFeed ? (
+              <span className="text-sm text-muted-foreground">Loading recipes…</span>
+            ) : feedError ? (
               <EmptyState
-                title="No saved recipes yet"
-                description="Save recipes you love and they’ll show up here."
-                actionLabel="Browse recipes"
-                onAction={() => navigate("/search")}
+                title="Couldn’t load recipes"
+                description={feedError}
+                actionLabel="Retry"
+                onAction={() => window.location.reload()}
               />
-            </TabsContent>
-          </Tabs>
-        </section>
+            ) : trending.length === 0 ? (
+              <EmptyState
+                title="No recipes yet"
+                description="Be the first to add one!"
+                actionLabel="Create a recipe"
+                onAction={() => navigate("/create")}
+              />
+            ) : (
+              <RecipeGrid recipes={trending} onOpen={(id) => navigate(`/recipe/${id}`)} />
+            )}
+          </motion.div>
+        )}
+
+        {tabValue === "new" && (
+          <motion.div
+            key="new"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          >
+            {loadingFeed ? (
+              <span className="text-sm text-muted-foreground">Loading recipes…</span>
+            ) : feedError ? (
+              <EmptyState
+                title="Couldn’t load recipes"
+                description={feedError}
+                actionLabel="Retry"
+                onAction={() => window.location.reload()}
+              />
+            ) : latest.length === 0 ? (
+              <EmptyState
+                title="No recent recipes"
+                description="Try again later or publish one now."
+                actionLabel="Create a recipe"
+                onAction={() => navigate("/create")}
+              />
+            ) : (
+              <RecipeGrid recipes={latest} onOpen={(id) => navigate(`/recipe/${id}`)} />
+            )}
+          </motion.div>
+        )}
+
+        {tabValue === "saved" && (
+          <motion.div
+            key="saved"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: EASE_OUT }}
+          >
+            <EmptyState
+              title="No saved recipes yet"
+              description="Save recipes you love and they’ll show up here."
+              actionLabel="Browse recipes"
+              onAction={() => navigate("/search")}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  </Tabs>
+</section>
+
       </main>
     </div>
   );
@@ -422,6 +460,15 @@ function ProfileSheet({
     }
   }
 
+  // Small helper for consistent tab transitions
+  const panelMotion = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+  transition: { duration: 0.22, ease: easeOut },
+} as const;
+
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -445,6 +492,7 @@ function ProfileSheet({
           defaultValue="profile"
           className="w-full"
         >
+          {/* Triggers */}
           <div className="px-4 pt-3">
             <TabsList
               className="
@@ -479,130 +527,138 @@ function ProfileSheet({
             </TabsList>
           </div>
 
+          {/* Animated panels */}
           <ScrollArea className="h-[calc(100dvh-140px)] px-4 py-3">
-            {/* Profile tab */}
-            <TabsContent value="profile" className="mt-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Account</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <form className="space-y-3" onSubmit={saveProfile}>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Display name</label>
-                      <Input
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value)}
-                        placeholder="Your name"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        This shows in the app and is saved to your Supabase user metadata.
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={saving}>
-                        {saving ? "Saving..." : "Save changes"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setNameInput(displayName)}
-                        disabled={saving}
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                    {message && (
-                      <p className="text-xs text-muted-foreground">{message}</p>
-                    )}
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* My Recipes tab */}
-            <TabsContent value="mine" className="mt-2">
-              {loadingMine ? (
-                <span className="text-sm text-muted-foreground">Loading your recipes…</span>
-              ) : mineError ? (
-                <EmptyState
-                  title="Couldn’t load your recipes"
-                  description={mineError}
-                  actionLabel="Retry"
-                  onAction={loadMyRecipes}
-                />
-              ) : myRecipes.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardHeader>
-                    <CardTitle className="text-base">My Recipes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm text-muted-foreground">
-                    <p>You haven’t published any recipes yet.</p>
-                    <Button
-                      onClick={() => {
-                        window.location.href = "/create";
-                      }}
-                      size="sm"
-                    >
-                      Create a recipe
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium">My Recipes</h3>
-                    <Button variant="ghost" size="sm" onClick={loadMyRecipes}>
-                      Refresh
-                    </Button>
-                  </div>
-                  <MyRecipeList
-                    recipes={myRecipes}
-                    onOpen={(id) => (window.location.href = `/recipe/${id}`)}
-                  />
-                </div>
+            <AnimatePresence mode="wait">
+              {tab === "profile" && (
+                <motion.div key="profile" {...panelMotion}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Account</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <form className="space-y-3" onSubmit={saveProfile}>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Display name</label>
+                          <Input
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value)}
+                            placeholder="Your name"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This shows in the app and is saved to your Supabase user metadata.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={saving}>
+                            {saving ? "Saving..." : "Save changes"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setNameInput(displayName)}
+                            disabled={saving}
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                        {message && (
+                          <p className="text-xs text-muted-foreground">{message}</p>
+                        )}
+                      </form>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               )}
-            </TabsContent>
 
-            {/* Favorites tab */}
-            <TabsContent value="favorites" className="mt-2">
-              <EmptyState
-                title="No favorites"
-                description="Tap the Save button on any recipe to add it here."
-                actionLabel="Explore recipes"
-                onAction={() => {
-                  window.location.href = "/search";
-                }}
-              />
-            </TabsContent>
+              {tab === "mine" && (
+                <motion.div key="mine" {...panelMotion}>
+                  {loadingMine ? (
+                    <span className="text-sm text-muted-foreground">Loading your recipes…</span>
+                  ) : mineError ? (
+                    <EmptyState
+                      title="Couldn’t load your recipes"
+                      description={mineError}
+                      actionLabel="Retry"
+                      onAction={loadMyRecipes}
+                    />
+                  ) : myRecipes.length === 0 ? (
+                    <Card className="border-dashed">
+                      <CardHeader>
+                        <CardTitle className="text-base">My Recipes</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm text-muted-foreground">
+                        <p>You haven’t published any recipes yet.</p>
+                        <Button
+                          onClick={() => {
+                            window.location.href = "/create";
+                          }}
+                          size="sm"
+                        >
+                          Create a recipe
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium">My Recipes</h3>
+                        <Button variant="ghost" size="sm" onClick={loadMyRecipes}>
+                          Refresh
+                        </Button>
+                      </div>
+                      <MyRecipeList
+                        recipes={myRecipes}
+                        onOpen={(id) => (window.location.href = `/recipe/${id}`)}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
-            {/* Sign out tab */}
-            <TabsContent value="signout" className="mt-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Sign out</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    You’ll be returned to the login screen.
-                  </p>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      onSignOut();
+              {tab === "favorites" && (
+                <motion.div key="favorites" {...panelMotion}>
+                  <EmptyState
+                    title="No favorites"
+                    description="Tap the Save button on any recipe to add it here."
+                    actionLabel="Explore recipes"
+                    onAction={() => {
+                      window.location.href = "/search";
                     }}
-                  >
-                    Sign out
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                  />
+                </motion.div>
+              )}
+
+              {tab === "signout" && (
+                <motion.div key="signout" {...panelMotion}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Sign out</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        You’ll be returned to the login screen.
+                      </p>
+                      <Button
+                        variant="destructive"
+                        onClick={() => {
+                          onSignOut();
+                        }}
+                      >
+                        Sign out
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </ScrollArea>
         </Tabs>
       </SheetContent>
     </Sheet>
   );
 }
+
 
 /* ---------- Small UI helpers (kept in this file for simplicity) ---------- */
 
@@ -627,13 +683,25 @@ function RecipeGrid({
   onOpen: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <motion.div
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+      initial="hidden"
+      animate="show"
+      variants={{
+        hidden: { opacity: 1 },
+        show: {
+          opacity: 1,
+          transition: { staggerChildren: 0.06, delayChildren: 0.05 },
+        },
+      }}
+    >
       {recipes.map((r) => (
         <RecipeCard key={r.id} recipe={r} onOpen={onOpen} />
       ))}
-    </div>
+    </motion.div>
   );
 }
+
 
 function RecipeCard({
   recipe,
@@ -643,43 +711,72 @@ function RecipeCard({
   onOpen: (id: string) => void;
 }) {
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
-    <div className="aspect-[16/10] w-full overflow-hidden">
-        <img
-          src={recipe.image}
-          alt={recipe.title}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-      </div>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{recipe.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="outline">{recipe.difficulty}</Badge>
-          <span>•</span>
-          <span>{recipe.minutes} min</span>
-          <span>•</span>
-          <div className="flex gap-2">
-            {recipe.tags.slice(0, 2).map((t) => (
-              <Badge key={t} variant="secondary" className="font-normal">
-                {t}
-              </Badge>
-            ))}
+    <motion.article
+      variants={{
+        hidden: { opacity: 0, y: 10 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.25 } },
+      }}
+      whileHover={{ y: -2 }}
+      transition={{ type: "spring", stiffness: 260, damping: 20 }}
+      className="group"
+    >
+      <Card className="overflow-hidden transition-shadow group-hover:shadow-lg">
+        {/* Shared element for image (pairs with RecipeDetail) */}
+        <motion.div
+          layoutId={`image-${recipe.id}`}
+          className="aspect-[16/10] w-full overflow-hidden"
+        >
+          <motion.img
+            src={recipe.image}
+            alt={recipe.title}
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            whileHover={{ scale: 1.03 }}
+            transition={{ duration: 0.25 }}
+          />
+        </motion.div>
+
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">{recipe.title}</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline">{recipe.difficulty}</Badge>
+            <span>•</span>
+            <span>{recipe.minutes} min</span>
+            <span>•</span>
+            <div className="flex gap-2">
+              {recipe.tags.slice(0, 2).map((t) => (
+                <Badge key={t} variant="secondary" className="font-normal">
+                  {t}
+                </Badge>
+              ))}
+            </div>
           </div>
-        </div>
-      </CardContent>
-      <CardFooter className="flex items-center justify-between">
-        <Button variant="default" onClick={() => onOpen(recipe.id)}>
-          View
-        </Button>
-        <Button variant="ghost">Save</Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="flex items-center justify-between">
+          <motion.button
+            className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-primary-foreground text-sm"
+            onClick={() => onOpen(recipe.id)}
+            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.02 }}
+            transition={{ duration: 0.12 }}
+          >
+            View
+          </motion.button>
+          <motion.button
+            className="text-sm text-muted-foreground hover:text-foreground"
+            whileTap={{ scale: 0.98 }}
+          >
+            Save
+          </motion.button>
+        </CardFooter>
+      </Card>
+    </motion.article>
   );
 }
+
 
 function MyRecipeList({
   recipes,

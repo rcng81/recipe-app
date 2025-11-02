@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -276,7 +277,10 @@ export default function RecipeDetail() {
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-6">
         <Card className="overflow-hidden">
           {/* Cover image */}
-          <div className="aspect-[16/9] w-full overflow-hidden">
+          <motion.div
+            layoutId={`image-${recipe.id}`}
+            className="aspect-[16/9] w-full overflow-hidden"
+          >
             <img
               src={recipe.image || PLACEHOLDER_IMAGE}
               alt={recipe.title}
@@ -284,7 +288,7 @@ export default function RecipeDetail() {
               loading="eager"
               decoding="async"
             />
-          </div>
+          </motion.div>
 
           <CardHeader className="pb-2">
             <div className="flex flex-wrap items-start justify-between gap-3">
