@@ -495,36 +495,50 @@ function ProfileSheet({
           {/* Triggers */}
           <div className="px-4 pt-3">
             <TabsList
-              className="
-                grid w-full h-full
-                [grid-template-columns:repeat(4,minmax(0,1fr))]
-                gap-2
-              "
-            >
-              {[
-                ["profile", "Profile"],
-                ["mine", "My Recipes"],
-                ["favorites", "Favorites"],
-                ["signout", "Sign out"],
-              ].map(([val, label]) => (
-                <TabsTrigger
-                  key={val}
-                  value={val}
-                  className="
-                    w-full min-w-0
-                    min-h-12 py-2 px-3
-                    inline-flex items-center justify-center text-center
-                    rounded-md text-xs sm:text-sm leading-snug
-                    break-words whitespace-normal
-                    data-[state=active]:bg-primary
-                    data-[state=active]:text-primary-foreground
-                    data-[state=active]:font-semibold
-                  "
-                >
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+  className="
+    relative grid w-full h-full
+    [grid-template-columns:repeat(4,minmax(0,1fr))]
+    gap-2
+    p-1 rounded-md
+    bg-muted
+  "
+>
+  {([
+    ["profile", "Profile"],
+    ["mine", "My Recipes"],
+    ["favorites", "Favorites"],
+    ["signout", "Sign out"],
+  ] as const).map(([val, label]) => {
+    const isActive = tab === val;
+    return (
+      <div key={val} className="relative">
+        {/* Active pill */}
+        {isActive && (
+          <motion.div
+            layoutId="profile-tabs-pill"
+            className="absolute inset-0 rounded-md bg-background shadow-sm"
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          />
+        )}
+
+        <TabsTrigger
+          value={val}
+          className={`
+            relative w-full z-10
+            min-h-10 py-2 px-3 rounded-md
+            text-xs sm:text-sm leading-snug
+            transition-colors
+            ${isActive ? "text-foreground" : "text-muted-foreground"}
+          `}
+        >
+          {label}
+        </TabsTrigger>
+      </div>
+    );
+  })}
+</TabsList>
+
+
           </div>
 
           {/* Animated panels */}
