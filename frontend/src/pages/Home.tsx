@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence, easeOut } from "framer-motion";
+import { Heart } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -24,6 +25,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRecipeLike } from "@/hooks/useRecipeLike";
 
 type Recipe = {
   id: string;
@@ -135,6 +137,7 @@ export default function Home() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -716,6 +719,85 @@ function RecipeGrid({
   );
 }
 
+// make this a file-scope component (not inside Home)
+function LikeButton({
+  liked,
+  onPress,
+  count,
+}: {
+  liked: boolean;
+  onPress: () => void;
+  count?: number | null;
+}) {
+  // Little “burst” positions
+  const BURST = [
+    { x: 0, y: -12 }, { x: 10, y: -8 }, { x: 12, y: 0 }, { x: 10, y: 8 },
+    { x: 0, y: 12 }, { x: -10, y: 8 }, { x: -12, y: 0 }, { x: -10, y: -8 },
+  ];
+
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      aria-pressed={liked}
+      className="relative inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm hover:text-foreground text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+    >
+      <motion.span
+        whileTap={{ scale: 0.9 }}
+        animate={liked ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+        transition={{ duration: 0.25 }}
+        className="grid place-items-center"
+      >
+        <span className="relative inline-block">
+          <Heart
+            className={`absolute inset-0 ${liked ? "text-red-500" : "text-transparent"}`}
+            fill={liked ? "currentColor" : "none"}
+            stroke="none"
+            width={20}
+            height={20}
+          />
+            <Heart
+              className={`${liked ? "text-red-500" : "text-muted-foreground"}`}
+              width={20}
+              height={20}
+            />
+        </span>
+      </motion.span>
+
+      {/* Optional count */}
+      {typeof count === "number" && (
+        <span className="text-xs tabular-nums">{count}</span>
+      )}
+
+      <span className="sr-only">{liked ? "Unlike" : "Like"}</span>
+
+      <AnimatePresence>
+        {liked && (
+          <motion.span
+            key="burst"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className="pointer-events-none absolute inset-0"
+          >
+            {BURST.map((p, i) => (
+              <motion.span
+                key={i}
+                initial={{ x: 0, y: 0, scale: 0.6, opacity: 1 }}
+                animate={{ x: p.x, y: p.y, scale: 1.1, opacity: 0 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: i * 0.01 }}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-red-500"
+              />
+            ))}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  );
+}
+
+
 
 function RecipeCard({
   recipe,
@@ -724,6 +806,9 @@ function RecipeCard({
   recipe: Recipe;
   onOpen: (id: string) => void;
 }) {
+  // hook to read & toggle like state for this recipe
+  const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
+
   return (
     <motion.article
       variants={{
@@ -754,6 +839,7 @@ function RecipeCard({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{recipe.title}</CardTitle>
         </CardHeader>
+
         <CardContent className="pt-0">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{recipe.difficulty}</Badge>
@@ -769,6 +855,7 @@ function RecipeCard({
             </div>
           </div>
         </CardContent>
+
         <CardFooter className="flex items-center justify-between">
           <motion.button
             className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-primary-foreground text-sm"
@@ -779,12 +866,24 @@ function RecipeCard({
           >
             View
           </motion.button>
-          <motion.button
-            className="text-sm text-muted-foreground hover:text-foreground"
-            whileTap={{ scale: 0.98 }}
-          >
-            Save
-          </motion.button>
+
+          <div className="flex items-center gap-1">
+            <LikeButton
+              liked={liked}
+              onPress={async () => {
+                if (loading) return;
+                try {
+                  await toggle();
+                } catch (e) {
+                  console.error("Failed to toggle like:", e);
+                }
+              }}
+              count={typeof count === "number" ? count : undefined}
+            />
+            {loading && (
+              <span className="sr-only">Loading like state…</span>
+            )}
+          </div>
         </CardFooter>
       </Card>
     </motion.article>
