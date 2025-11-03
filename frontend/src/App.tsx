@@ -4,6 +4,7 @@ import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import CreateRecipe from "@/pages/CreateRecipe";
 import RecipeDetail from "@/pages/RecipeDetail";
+import Search from "@/pages/Search";
 
 function RouteContainer({ children }: { children: React.ReactNode }) {
   return (
@@ -56,6 +57,11 @@ function AnimatedRoutes() {
             </RouteContainer>
           }
         />
+        <Route 
+          path="/search" 
+          element={
+            <Search />
+          } />
       </Routes>
     </AnimatePresence>
   );
