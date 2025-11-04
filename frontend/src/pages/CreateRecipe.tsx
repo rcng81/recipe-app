@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TAG_OPTIONS, normalizeTag, toTitleCase } from "@/constants/tags";
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 
@@ -62,7 +63,6 @@ export default function CreateRecipe() {
 
   // Tags
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
 
   // Ingredients (chip-style add)
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -87,19 +87,21 @@ export default function CreateRecipe() {
   }, [title, minutes, ingredients, steps]);
 
   // --- Tag handlers ---
-  function handleAddTag() {
-    const t = tagInput.trim();
-    if (!t) return;
-    if (tags.includes(t)) {
-      setTagInput("");
-      return;
+  function toggleTag(tag: string) {
+  setTags((prev) => {
+    const norm = normalizeTag(tag);
+    const set = new Set(prev.map(normalizeTag));
+    if (set.has(norm)) {
+      // remove
+      return prev.filter((t) => normalizeTag(t) !== norm);
+    } else {
+      // add
+      return [...prev, tag];
     }
-    setTags((prev) => [...prev, t]);
-    setTagInput("");
-  }
-  function handleRemoveTag(tag: string) {
-    setTags((prev) => prev.filter((t) => t !== tag));
-  }
+  });
+}
+
+
 
   // --- Ingredient (chip) handlers ---
   function handleAddIngredient() {
@@ -396,41 +398,38 @@ navigate("/");
                 </div>
               </div>
 
-              {/* Tags */}
+              {/* Tags (fixed set) */}
               <div className="space-y-2">
                 <Label className="text-base">Tags</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder='Type a tag and press "Add" (e.g., Vegetarian)'
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddTag();
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="secondary" onClick={handleAddTag}>
-                    Add
-                  </Button>
+
+                <div className="flex flex-wrap gap-2">
+                  {TAG_OPTIONS.map((t) => {
+                    const active = tags.map(normalizeTag).includes(normalizeTag(t));
+                    return (
+                      <Button
+                        key={t}
+                        type="button"
+                        variant={active ? "default" : "secondary"}
+                        className="rounded-full h-8 px-3"
+                        onClick={() => toggleTag(t)}
+                      >
+                        {t}
+                      </Button>
+                    );
+                  })}
                 </div>
+
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-1">
                     {tags.map((t) => (
-                      <Badge
-                        key={t}
-                        variant="secondary"
-                        className="cursor-pointer"
-                        onClick={() => handleRemoveTag(t)}
-                        title="Click to remove"
-                      >
-                        #{t}
+                      <Badge key={t} variant="secondary" className="cursor-default">
+                        #{toTitleCase(normalizeTag(t))}
                       </Badge>
                     ))}
                   </div>
                 )}
               </div>
+
 
               {/* Errors */}
               {errors.length > 0 && (

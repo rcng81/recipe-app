@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRecipeLike } from "@/hooks/useRecipeLike";
+import { TOP_TAGS, toTitleCase, normalizeTag } from "@/constants/tags";
 
 type Recipe = {
   id: string;
@@ -130,6 +131,21 @@ export default function Home() {
     navigate(`/search?q=${encodeURIComponent(q)}`);
   }
 
+  function QuickTag({ tag }: { tag: string }) {
+  const navigate = useNavigate();
+  const q = `#${normalizeTag(tag)}`;
+  return (
+    <Badge
+      variant="secondary"
+      className="cursor-pointer"
+      onClick={() => navigate(`/search?q=${encodeURIComponent(q)}`)}
+    >
+      #{toTitleCase(normalizeTag(tag))}
+    </Badge>
+  );
+}
+
+
   if (loadingUser) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -208,12 +224,10 @@ export default function Home() {
                   </Button>
                 </div>
               </form>
-
               <div className="flex flex-wrap gap-2">
-                <QuickTag tag="Pasta" />
-                <QuickTag tag="Vegetarian" />
-                <QuickTag tag="High Protein" />
-                <QuickTag tag="Air Fryer" />
+                {TOP_TAGS.map((t) => (
+                  <QuickTag key={t} tag={t} />
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -233,38 +247,28 @@ export default function Home() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Popular categories</h2>
           <div className="flex flex-wrap gap-2">
-            {[
-              "Breakfast",
-              "Lunch",
-              "Dinner",
-              "Dessert",
-              "Vegan",
-              "Gluten-Free",
-              "Keto",
-              "Air Fryer",
-              "BBQ",
-              "Meal Prep",
-            ].map((c) => (
+            {TOP_TAGS.map((c) => (
               <Button
                 key={c}
                 variant="secondary"
                 className="rounded-full"
-                onClick={() => navigate(`/search?q=${encodeURIComponent(c)}`)}
+                onClick={() => navigate(`/search?q=${encodeURIComponent('#' + normalizeTag(c))}`)}
               >
-                {c}
+                {toTitleCase(normalizeTag(c))}
               </Button>
             ))}
           </div>
         </section>
 
+
         <Separator />
 
         {/* Feed */}
         <section className="space-y-4">
-  <Tabs
-    value={tabValue}
-    onValueChange={(v) => setTabValue(v as typeof tabValue)}
-    className="w-full"
+          <Tabs
+            value={tabValue}
+            onValueChange={(v) => setTabValue(v as typeof tabValue)}
+            className="w-full"
   >
     {/* Title + Tabs in one row */}
     <div className="flex items-center justify-between">
