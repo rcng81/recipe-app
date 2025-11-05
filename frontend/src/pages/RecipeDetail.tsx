@@ -12,6 +12,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { toTitleCase, normalizeTag } from "@/constants/tags";
+
+const displayTag = (t: string) => `#${toTitleCase(normalizeTag(t))}`;
+
+function TagPill({
+  tag,
+  onClick,
+  variant = "secondary",
+}: {
+  tag: string;
+  onClick?: () => void;
+  variant?: "secondary" | "outline" | "default";
+}) {
+  return (
+    <Badge
+      variant={variant}
+      className="font-medium rounded-full px-2.5 py-1 cursor-pointer"
+      onClick={onClick}
+      title={displayTag(tag)}
+    >
+      {displayTag(tag)}
+    </Badge>
+  );
+}
+
 
 type RecipeRow = {
   id: string;
@@ -318,11 +343,18 @@ export default function RecipeDetail() {
 
             {Array.isArray(recipe.tags) && recipe.tags.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                {recipe.tags.map((t) => (
-                  <Badge key={String(t)} variant="secondary" className="font-normal">
-                    #{String(t)}
-                  </Badge>
-                ))}
+                {recipe.tags.map((t) => {
+                  const tag = String(t);
+                  return (
+                    <TagPill
+                      key={tag}
+                      tag={tag}
+                      onClick={() =>
+                        navigate(`/search?q=${encodeURIComponent('#' + normalizeTag(tag))}`)
+                      }
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </CardHeader>

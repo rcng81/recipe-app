@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useRecipeLike } from "@/hooks/useRecipeLike";
+import { toTitleCase, normalizeTag } from "@/constants/tags";
 
 type Recipe = {
   id: string;
@@ -23,6 +24,29 @@ const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1400&q=80";
 
 type SortKey = "relevance" | "newest" | "oldest" | "timeAsc" | "timeDesc";
+
+const displayTag = (t: string) => `#${toTitleCase(normalizeTag(t))}`;
+
+function TagPill({
+    tag,
+    onClick,
+    variant = "secondary",
+  }: {
+    tag: string;
+    onClick?: () => void;
+    variant?: "secondary" | "outline" | "default";
+  }) {
+    return (
+      <Badge
+        variant={variant}
+        className="font-medium rounded-full px-2.5 py-1 cursor-pointer"
+        onClick={onClick}
+        title={displayTag(tag)}
+      >
+        {displayTag(tag)}
+      </Badge>
+    );
+  }
 
 export default function Search() {
   const navigate = useNavigate();
@@ -208,8 +232,22 @@ export default function Search() {
           {/* Active chips */}
           <div className="flex flex-wrap gap-2">
             {!!queryFromURL && (
-              <Badge variant="secondary">Query: {queryFromURL}</Badge>
+              isTagSearch ? (
+                <TagPill
+                  tag={queryFromURL.slice(1)}
+                  variant="default"
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.set("q", `#${normalizeTag(queryFromURL.slice(1))}`);
+                    next.set("page", "1");
+                    setParams(next, { replace: false });
+                  }}
+                />
+              ) : (
+                <Badge variant="secondary">Query: {queryFromURL}</Badge>
+              )
             )}
+
             {diffs.size > 0 &&
               Array.from(diffs).map((d) => (
                 <Badge key={d} variant="outline" className="cursor-default">{d}</Badge>
@@ -466,6 +504,7 @@ function RecipeCard({
   onOpen: (id: string) => void;
 }) {
   const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
+  const navigate = useNavigate();
 
   return (
     <motion.article
@@ -502,9 +541,13 @@ function RecipeCard({
             <span>•</span>
             <div className="flex gap-2">
               {recipe.tags.slice(0, 2).map((t) => (
-                <Badge key={t} variant="secondary" className="font-normal">
-                  {t}
-                </Badge>
+                <TagPill
+                  key={t}
+                  tag={t}
+                  onClick={() =>
+                    navigate(`/search?q=${encodeURIComponent('#' + normalizeTag(t))}`)
+                  }
+                />
               ))}
             </div>
           </div>

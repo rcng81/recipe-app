@@ -131,20 +131,6 @@ export default function Home() {
     navigate(`/search?q=${encodeURIComponent(q)}`);
   }
 
-  function QuickTag({ tag }: { tag: string }) {
-  const navigate = useNavigate();
-  const q = `#${normalizeTag(tag)}`;
-  return (
-    <Badge
-      variant="secondary"
-      className="cursor-pointer"
-      onClick={() => navigate(`/search?q=${encodeURIComponent(q)}`)}
-    >
-      #{toTitleCase(normalizeTag(tag))}
-    </Badge>
-  );
-}
-
 
   if (loadingUser) {
     return (
@@ -787,16 +773,20 @@ useEffect(() => {
 
 function QuickTag({ tag }: { tag: string }) {
   const navigate = useNavigate();
+  const normalized = normalizeTag(tag);
+  const q = `#${normalized}`;
   return (
     <Badge
       variant="secondary"
       className="cursor-pointer"
-      onClick={() => navigate(`/search?q=${encodeURIComponent(tag)}`)}
+      onClick={() => navigate(`/search?q=${encodeURIComponent(q)}`)}
+      title={`Search tag: #${normalized}`}
     >
-      #{tag}
+      #{toTitleCase(normalized)}
     </Badge>
   );
 }
+
 
 function RecipeGrid({
   recipes,
@@ -910,6 +900,7 @@ function RecipeCard({
   onOpen: (id: string) => void;
 }) {
   const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
+  const displayTag = (t: string) => `#${toTitleCase(normalizeTag(t))}`;
 
   return (
     <motion.article
@@ -950,7 +941,7 @@ function RecipeCard({
             <div className="flex gap-2">
               {recipe.tags.slice(0, 2).map((t) => (
                 <Badge key={t} variant="secondary" className="font-normal">
-                  {t}
+                  {displayTag(t)}
                 </Badge>
               ))}
             </div>

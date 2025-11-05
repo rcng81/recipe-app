@@ -8,7 +8,7 @@ export const TAG_OPTIONS = [
 
 // A small subset to showcase on Home
 export const TOP_TAGS = [
-  "Pasta", "Vegetarian", "High Protein", "Air Fryer", "Meal Prep", "Dessert"
+  "Breakfast", "Lunch", "Dinner", "Vegetarian", "High Protein", "Air Fryer", "Meal Prep", "Dessert"
 ];
 
 // Re-usable helpers
