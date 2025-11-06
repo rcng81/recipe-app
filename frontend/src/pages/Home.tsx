@@ -54,6 +54,11 @@ export default function Home() {
   const [tabValue, setTabValue] = useState<"trending" | "new" | "saved">("trending");
   const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
+  const [saved, setSaved] = useState<Recipe[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [savedError, setSavedError] = useState<string | null>(null);
+
+
   function mapRowToRecipe(row: any): Recipe {
     return {
       id: row.id,
@@ -65,6 +70,52 @@ export default function Home() {
       created_at: row.created_at,
     };
   }
+
+  async function loadSaved() {
+  setLoadingSaved(true);
+  setSavedError(null);
+  try {
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    const uid = userRes.user?.id;
+    if (!uid) throw new Error("Not authenticated.");
+
+    const { data: likeRows, error: likeErr } = await supabase
+      .from("recipe_likes")
+      .select("recipe_id")
+      .eq("user_id", uid);
+
+    if (likeErr) throw likeErr;
+
+    const ids = (likeRows ?? []).map(r => r.recipe_id);
+    if (ids.length === 0) {
+      setSaved([]);
+      return;
+    }
+
+    const { data: recipeRows, error: recipeErr } = await supabase
+      .from("recipes")
+      .select("id, title, minutes, difficulty, image, tags, created_at")
+      .in("id", ids)
+      .order("created_at", { ascending: false });
+
+    if (recipeErr) throw recipeErr;
+
+    setSaved((recipeRows ?? []).map(mapRowToRecipe));
+  } catch (e: any) {
+    setSavedError(e.message ?? "Failed to load saved recipes.");
+  } finally {
+    setLoadingSaved(false);
+  }
+}
+
+  useEffect(() => {
+    if (tabValue === "saved") {
+      loadSaved();
+    }
+  }, [tabValue]);
+
+
 
   useEffect(() => {
     let mounted = true;
@@ -350,12 +401,28 @@ export default function Home() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22, ease: EASE_OUT }}
           >
-            <EmptyState
-              title="No saved recipes yet"
-              description="Save recipes you love and they’ll show up here."
-              actionLabel="Browse recipes"
-              onAction={() => navigate("/search")}
-            />
+            {loadingSaved ? (
+              <span className="text-sm text-muted-foreground">Loading saved…</span>
+            ) : savedError ? (
+              <EmptyState
+                title="Couldn’t load saved"
+                description={savedError}
+                actionLabel="Retry"
+                onAction={loadSaved}
+              />
+            ) : saved.length === 0 ? (
+              <EmptyState
+                title="No saved recipes yet"
+                description="Tap the heart on any recipe to add it here."
+                actionLabel="Browse recipes"
+                onAction={() => navigate("/search")}
+              />
+            ) : (
+              <RecipeGrid
+                recipes={saved}
+                onOpen={(id) => navigate(`/recipe/${id}`)}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -966,6 +1033,7 @@ function RecipeCard({
                 if (loading) return;
                 try {
                   await toggle();
+                  window.dispatchEvent(new Event("likes-changed"));
                 } catch (e) {
                   console.error("Failed to toggle like:", e);
                 }
