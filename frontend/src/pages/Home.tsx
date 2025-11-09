@@ -248,7 +248,7 @@ export default function Home() {
               <form onSubmit={handleSearch} className="flex gap-2">
                 <Input
                   name="q"
-                  placeholder="Try “chicken”, “vegan pasta”, or “30 min dinner”"
+                  placeholder="Try “chicken” or “vegan pasta”"
                 />
                 <div className="flex gap-2">
                   <Button type="submit">Search</Button>
