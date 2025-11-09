@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toTitleCase, normalizeTag } from "@/constants/tags";
+import { useRecipeLike } from "@/hooks/useRecipeLike";
+import { Heart } from "lucide-react";
 
 const displayTag = (t: string) => `#${toTitleCase(normalizeTag(t))}`;
 
@@ -36,6 +38,42 @@ function TagPill({
     </Badge>
   );
 }
+
+function SaveToggle({ recipeId }: { recipeId: string }) {
+  const { liked, count, loading, toggle } = useRecipeLike(recipeId);
+
+  async function onClick() {
+    try {
+      await toggle();
+      // Let other parts of the app (ProfileSheet -> Favorites) refresh automatically
+      window.dispatchEvent(new Event("likes-changed"));
+    } catch (e) {
+      console.error("Failed to toggle like:", e);
+    }
+  }
+
+  return (
+    <Button
+      variant={liked ? "secondary" : "default"}
+      onClick={onClick}
+      disabled={loading}
+      className="inline-flex items-center gap-2"
+      title={liked ? "Unsave from favorites" : "Save to favorites"}
+    >
+      <Heart
+        className={liked ? "text-red-500" : "text-muted-foreground"}
+        fill={liked ? "currentColor" : "none"}
+        strokeWidth={liked ? 0 : 2}
+        size={16}
+      />
+      {loading ? (liked ? "Unsaving…" : "Saving…") : liked ? "Unsave" : "Save"}
+      {typeof count === "number" && (
+        <span className="text-xs tabular-nums opacity-80">({count})</span>
+      )}
+    </Button>
+  );
+}
+
 
 
 type RecipeRow = {
@@ -337,7 +375,7 @@ export default function RecipeDetail() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="default">Save</Button>
+                {recipe?.id ? <SaveToggle recipeId={recipe.id} /> : null}
               </div>
             </div>
 
