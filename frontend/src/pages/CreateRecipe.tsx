@@ -140,12 +140,9 @@ export default function CreateRecipe() {
 
     setSubmitting(true);
     try {
-      // Get user id
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData?.user) throw new Error("Not authenticated.");
-      const userId = userData.user.id;
 
-      // Upload image if present
       let uploadedUrl: string | null = null;
       if (imageFile) {
         setUploading(true);
@@ -154,7 +151,7 @@ export default function CreateRecipe() {
         const filePath = `recipes/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from("images") // BUCKET NAME (created in step B)
+          .from("images")
           .upload(filePath, imageFile, {
             cacheControl: "3600",
             upsert: false,

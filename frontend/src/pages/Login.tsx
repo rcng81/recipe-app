@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthApiError } from "@supabase/supabase-js";
 import {
   Card,
   CardHeader,
@@ -172,8 +171,5 @@ export default function AuthCard() {
         </section>
       </div>
   );
-}
-function setInfoMsg(arg0: string) {
-  throw new Error("Function not implemented.");
 }
 
