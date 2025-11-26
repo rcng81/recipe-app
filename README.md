@@ -3,7 +3,7 @@
 A modern recipe-sharing web app where users can log in, create recipes, browse tags, and save their favorites.  
 Built to explore full-stack development with React, TypeScript, Supabase, and ShadCN UI.
 
-Live Site 👉 [https://your-recipe-app.vercel.app/] <!-- Update this link -->
+Live Site 👉 [https://recipy-space.vercel.app/login] <!-- Update this link -->
 
 ---
 
