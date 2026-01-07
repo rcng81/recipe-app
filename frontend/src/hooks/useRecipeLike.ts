@@ -37,6 +37,12 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
         console.warn("Failed to read auth user for likes:", userErr.message);
       }
 
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      const uid = user?.id ?? null;
+      if (userErr) {
+        console.warn("Failed to read auth user for likes:", userErr.message);
+      }
+
       if (uid) {
         const { count: userCount, error: likedErr } = await supabase
           .from("recipe_likes")
