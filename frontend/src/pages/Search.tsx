@@ -51,6 +51,7 @@ function TagPill({
 export default function Search() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [user, setUser] = useState<any | null>(null);
 
   const initialQ = (params.get("q") || "").trim();
   const [qInput, setQInput] = useState(initialQ);
@@ -72,6 +73,12 @@ export default function Search() {
   useEffect(() => {
     setQInput(queryFromURL);
   }, [queryFromURL]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+  }, []);
 
   const isTagSearch = useMemo(() => {
     return queryFromURL.startsWith("#") && queryFromURL.slice(1).trim().length > 0;
@@ -181,7 +188,10 @@ export default function Search() {
             />
             <Button type="submit">Search</Button>
           </form>
-          <Button className="hidden md:inline-flex" onClick={() => navigate("/create")}>
+          <Button
+            className="hidden md:inline-flex"
+            onClick={() => (user ? navigate("/create") : navigate("/login"))}
+          >
             New recipe
           </Button>
         </div>
@@ -503,8 +513,10 @@ function RecipeCard({
   recipe: Recipe;
   onOpen: (id: string) => void;
 }) {
-  const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
   const navigate = useNavigate();
+  const { liked, count, loading, toggle } = useRecipeLike(recipe.id, {
+    onAuthRequired: () => navigate("/login"),
+  });
 
   return (
     <motion.article
