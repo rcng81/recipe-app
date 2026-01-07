@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabasePublic } from "@/lib/supabase";
 
 type UseRecipeLikeOptions = {
   onAuthRequired?: () => void;
@@ -18,7 +18,7 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
   async function refresh() {
     setLoading(true);
     try {
-      const { count: totalCount, error: countErr } = await supabase
+      const { count: totalCount, error: countErr } = await supabasePublic
         .from("recipe_likes")
         .select("*", { count: "exact", head: true })
         .eq("recipe_id", recipeId);
