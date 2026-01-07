@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabasePublic } from "@/lib/supabase";
 
 type UseRecipeLikeOptions = {
   onAuthRequired?: () => void;
@@ -10,10 +10,15 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function getUserId() {
+    const { data, error } = await supabase.auth.getUser();
+    return { uid: data?.user?.id ?? null, error };
+  }
+
   async function refresh() {
     setLoading(true);
     try {
-      const { count: totalCount, error: countErr } = await supabase
+      const { count: totalCount, error: countErr } = await supabasePublic
         .from("recipe_likes")
         .select("*", { count: "exact", head: true })
         .eq("recipe_id", recipeId);
@@ -21,8 +26,7 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
       if (countErr) throw countErr;
       setCount(totalCount ?? 0);
 
-      const { data: { user }, error: userErr } = await supabase.auth.getUser();
-      const uid = user?.id ?? null;
+      const { uid, error: userErr } = await getUserId();
       if (userErr) {
         console.warn("Failed to read auth user for likes:", userErr.message);
       }
@@ -55,12 +59,11 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
   }, [recipeId]);
 
   async function toggle() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { uid } = await getUserId();
+    if (!uid) {
       options?.onAuthRequired?.();
       throw new Error("Not authenticated");
     }
-    const uid = user.id;
 
     try {
       if (liked) {
