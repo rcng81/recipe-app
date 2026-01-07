@@ -23,8 +23,12 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
         .select("*", { count: "exact", head: true })
         .eq("recipe_id", recipeId);
 
-      if (countErr) throw countErr;
-      setCount(totalCount ?? 0);
+      if (countErr) {
+        console.warn("Failed to fetch like count:", countErr.message);
+      }
+      const resolvedCount = totalCount ?? 0;
+      console.info("Like count for recipe:", recipeId, resolvedCount);
+      setCount(resolvedCount);
 
       const { uid, error: userErr } = await getUserId();
       if (userErr) {
