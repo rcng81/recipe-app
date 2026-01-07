@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export function useRecipeLike(recipeId: string) {
+type UseRecipeLikeOptions = {
+  onAuthRequired?: () => void;
+};
+
+export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) {
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +53,10 @@ export function useRecipeLike(recipeId: string) {
 
   async function toggle() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
+    if (!user) {
+      options?.onAuthRequired?.();
+      throw new Error("Not authenticated");
+    }
     const uid = user.id;
 
     try {

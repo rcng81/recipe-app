@@ -40,7 +40,10 @@ function TagPill({
 }
 
 function SaveToggle({ recipeId }: { recipeId: string }) {
-  const { liked, count, loading, toggle } = useRecipeLike(recipeId);
+  const navigate = useNavigate();
+  const { liked, count, loading, toggle } = useRecipeLike(recipeId, {
+    onAuthRequired: () => navigate("/login"),
+  });
 
   async function onClick() {
     try {
@@ -203,11 +206,7 @@ export default function RecipeDetail() {
       try {
         const { data: sessionRes, error: sessErr } = await supabase.auth.getSession();
         if (sessErr) throw sessErr;
-        if (!sessionRes.session) {
-          navigate("/login");
-          return;
-        }
-        const uid = sessionRes.session.user.id;
+        const uid = sessionRes.session?.user.id ?? null;
 
         const { data, error } = await supabase
           .from("recipes")
@@ -233,7 +232,7 @@ export default function RecipeDetail() {
         if (!mounted) return;
 
         setRecipe(data as RecipeRow);
-        setIsOwner((data?.author_id ?? "") === uid);
+        setIsOwner(!!uid && (data?.author_id ?? "") === uid);
       } catch (e: any) {
         if (!mounted) return;
         setErr(e?.message ?? "Failed to load recipe.");
