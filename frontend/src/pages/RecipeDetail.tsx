@@ -39,8 +39,12 @@ function TagPill({
   );
 }
 
-function SaveToggle({ recipeId }: { recipeId: string }) {
-  const { liked, count, loading, toggle } = useRecipeLike(recipeId);
+function SaveToggle({ recipeId, initialCount }: { recipeId: string; initialCount?: number | null }) {
+  const navigate = useNavigate();
+  const { liked, count, loading, toggle } = useRecipeLike(recipeId, {
+    onAuthRequired: () => navigate("/login"),
+    initialCount: typeof initialCount === "number" ? initialCount : null,
+  });
 
   async function onClick() {
     try {
@@ -84,6 +88,7 @@ type RecipeRow = {
   difficulty: "Easy" | "Medium" | "Hard" | null;
   tags: string[] | null;
   created_at?: string | null;
+  likeCount?: number | null;
 
   description?: unknown;
   ingredients?: unknown;
@@ -203,11 +208,7 @@ export default function RecipeDetail() {
       try {
         const { data: sessionRes, error: sessErr } = await supabase.auth.getSession();
         if (sessErr) throw sessErr;
-        if (!sessionRes.session) {
-          navigate("/login");
-          return;
-        }
-        const uid = sessionRes.session.user.id;
+        const uid = sessionRes.session?.user.id ?? null;
 
         const { data, error } = await supabase
           .from("recipes")
@@ -220,6 +221,7 @@ export default function RecipeDetail() {
             difficulty,
             tags,
             created_at,
+            recipe_likes(count),
             description,
             ingredients,
             steps,
@@ -232,8 +234,15 @@ export default function RecipeDetail() {
         if (error) throw error;
         if (!mounted) return;
 
-        setRecipe(data as RecipeRow);
-        setIsOwner((data?.author_id ?? "") === uid);
+        const likeCount =
+          Array.isArray((data as any)?.recipe_likes) && (data as any).recipe_likes.length > 0
+            ? (data as any).recipe_likes[0]?.count ?? 0
+            : typeof (data as any)?.recipe_likes?.count === "number"
+              ? (data as any).recipe_likes.count
+              : null;
+
+        setRecipe({ ...(data as RecipeRow), likeCount });
+        setIsOwner(!!uid && (data?.author_id ?? "") === uid);
       } catch (e: any) {
         if (!mounted) return;
         setErr(e?.message ?? "Failed to load recipe.");
@@ -375,7 +384,9 @@ export default function RecipeDetail() {
               </div>
 
               <div className="flex items-center gap-2">
-                {recipe?.id ? <SaveToggle recipeId={recipe.id} /> : null}
+                {recipe?.id ? (
+                  <SaveToggle recipeId={recipe.id} initialCount={recipe.likeCount ?? null} />
+                ) : null}
               </div>
             </div>
 

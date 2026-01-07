@@ -36,6 +36,7 @@ type Recipe = {
   image: string;
   tags: string[];
   created_at?: string;
+  likeCount?: number | null;
 };
 
 const PLACEHOLDER_IMAGE =
@@ -45,6 +46,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [loadingUser, setLoadingUser] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [user, setUser] = useState<any | null>(null);
 
   const [latest, setLatest] = useState<Recipe[]>([]);
   const [trending, setTrending] = useState<Recipe[]>([]);
@@ -68,6 +70,12 @@ export default function Home() {
       image: row.image || PLACEHOLDER_IMAGE,
       tags: row.tags ?? [],
       created_at: row.created_at,
+      likeCount:
+        Array.isArray(row.recipe_likes) && row.recipe_likes.length > 0
+          ? row.recipe_likes[0]?.count ?? 0
+          : typeof row.recipe_likes?.count === "number"
+            ? row.recipe_likes.count
+            : null,
     };
   }
 
@@ -78,7 +86,11 @@ export default function Home() {
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
     if (userErr) throw userErr;
     const uid = userRes.user?.id;
-    if (!uid) throw new Error("Not authenticated.");
+    if (!uid) {
+      setSaved([]);
+      setSavedError("Sign in to view saved recipes.");
+      return;
+    }
 
     const { data: likeRows, error: likeErr } = await supabase
       .from("recipe_likes")
@@ -113,7 +125,7 @@ export default function Home() {
     if (tabValue === "saved") {
       loadSaved();
     }
-  }, [tabValue]);
+  }, [tabValue, user]);
 
 
 
@@ -122,37 +134,46 @@ export default function Home() {
     (async () => {
       const {
         data: { session },
-        error,
       } = await supabase.auth.getSession();
-      if (error || !session) {
-        navigate("/login");
-        return;
-      }
 
+      if (!mounted) return;
+      setUser(session?.user ?? null);
       const name =
-        (session.user.user_metadata?.name as string | undefined) ??
-        session.user.email?.split("@")[0] ??
+        (session?.user.user_metadata?.name as string | undefined) ??
+        session?.user.email?.split("@")[0] ??
         null;
+      setDisplayName(name);
+      setLoadingUser(false);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-      if (mounted) {
-        setDisplayName(name);
-        setLoadingUser(false);
-        setLoadingFeed(true);
-        setFeedError(null);
-        try {
-          const { data: latestRows, error: latestErr } = await supabase
-            .from("recipes")
-            .select("id, title, minutes, difficulty, image, tags, created_at")
-            .order("created_at", { ascending: false })
-            .limit(12);
-          if (latestErr) throw latestErr;
+  useEffect(() => {
+    let mounted = true;
+    setLoadingFeed(true);
+    setFeedError(null);
+    (async () => {
+      try {
+        const { data: latestRows, error: latestErr } = await supabase
+          .from("recipes")
+          .select("id, title, minutes, difficulty, image, tags, created_at, recipe_likes(count)")
+          .order("created_at", { ascending: false })
+          .limit(12);
+        if (latestErr) throw latestErr;
 
-          const latestMapped = (latestRows ?? []).map(mapRowToRecipe);
+        const latestMapped = (latestRows ?? []).map(mapRowToRecipe);
+        if (mounted) {
           setLatest(latestMapped);
           setTrending(latestMapped);
-        } catch (err: any) {
+        }
+      } catch (err: any) {
+        if (mounted) {
           setFeedError(err.message ?? "Failed to load recipes.");
-        } finally {
+        }
+      } finally {
+        if (mounted) {
           setLoadingFeed(false);
         }
       }
@@ -160,7 +181,7 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, []);
 
   const initials = useMemo(() => {
     if (!displayName) return "U";
@@ -171,6 +192,8 @@ export default function Home() {
 
   async function handleSignOut() {
     await supabase.auth.signOut();
+    setUser(null);
+    setDisplayName(null);
     navigate("/login");
   }
 
@@ -198,16 +221,24 @@ export default function Home() {
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
           {/* Avatar opens Profile Sheet */}
-          <ProfileSheet
-            initials={initials}
-            displayName={displayName ?? "Chef"}
-            onSignOut={handleSignOut}
-            onDisplayNameUpdated={setDisplayName}
-          />
+          {user ? (
+            <ProfileSheet
+              initials={initials}
+              displayName={displayName ?? "Chef"}
+              onSignOut={handleSignOut}
+              onDisplayNameUpdated={setDisplayName}
+            />
+          ) : (
+            <Avatar className="h-9 w-9">
+              <AvatarFallback>G</AvatarFallback>
+            </Avatar>
+          )}
 
           <div className="mr-auto">
-            <p className="text-xs text-muted-foreground">Welcome back</p>
-            <p className="text-sm font-medium">{displayName ?? "Chef"}</p>
+            <p className="text-xs text-muted-foreground">
+              {user ? "Welcome back" : "Welcome"}
+            </p>
+            <p className="text-sm font-medium">{displayName ?? "Guest"}</p>
           </div>
 
           <form onSubmit={handleSearch} className="hidden md:flex items-center gap-2">
@@ -218,18 +249,31 @@ export default function Home() {
             />
             <Button type="submit">Search</Button>
           </form>
-          <Button className="hidden md:inline-flex" onClick={() => navigate("/create")}>
+          <Button
+            className="hidden md:inline-flex"
+            onClick={() => (user ? navigate("/create") : navigate("/login"))}
+          >
             New recipe
           </Button>
 
           {/*Mobile button display*/}
-          <Button size="icon" className="md:hidden" onClick={() => navigate("/create")}>
+          <Button
+            size="icon"
+            className="md:hidden"
+            onClick={() => (user ? navigate("/create") : navigate("/login"))}
+          >
             +
           </Button>
 
-          <Button variant="outline" className="ml-2" onClick={handleSignOut}>
-            Sign out
-          </Button>
+          {user ? (
+            <Button variant="outline" className="ml-2" onClick={handleSignOut}>
+              Sign out
+            </Button>
+          ) : (
+            <Button variant="outline" className="ml-2" onClick={() => navigate("/login")}>
+              Sign in
+            </Button>
+          )}
         </div>
       </header>
 
@@ -255,7 +299,7 @@ export default function Home() {
                   <Button
                     variant="secondary"
                     type="button"
-                    onClick={() => (window.location.href = "/create")}
+                    onClick={() => (user ? navigate("/create") : navigate("/login"))}
                   >
                     Create a recipe
                   </Button>
@@ -355,7 +399,7 @@ export default function Home() {
                 title="No recipes yet"
                 description="Be the first to add one!"
                 actionLabel="Create a recipe"
-                onAction={() => navigate("/create")}
+                onAction={() => (user ? navigate("/create") : navigate("/login"))}
               />
             ) : (
               <RecipeGrid recipes={trending} onOpen={(id) => navigate(`/recipe/${id}`)} />
@@ -385,7 +429,7 @@ export default function Home() {
                 title="No recent recipes"
                 description="Try again later or publish one now."
                 actionLabel="Create a recipe"
-                onAction={() => navigate("/create")}
+                onAction={() => (user ? navigate("/create") : navigate("/login"))}
               />
             ) : (
               <RecipeGrid recipes={latest} onOpen={(id) => navigate(`/recipe/${id}`)} />
@@ -405,10 +449,14 @@ export default function Home() {
               <span className="text-sm text-muted-foreground">Loading saved…</span>
             ) : savedError ? (
               <EmptyState
-                title="Couldn’t load saved"
-                description={savedError}
-                actionLabel="Retry"
-                onAction={loadSaved}
+                title={user ? "Couldn’t load saved" : "Sign in required"}
+                description={
+                  user
+                    ? savedError
+                    : "Sign in to save recipes and access your favorites."
+                }
+                actionLabel={user ? "Retry" : "Sign in"}
+                onAction={() => (user ? loadSaved() : navigate("/login"))}
               />
             ) : saved.length === 0 ? (
               <EmptyState
@@ -966,7 +1014,11 @@ function RecipeCard({
   recipe: Recipe;
   onOpen: (id: string) => void;
 }) {
-  const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
+  const navigate = useNavigate();
+  const { liked, count, loading, toggle } = useRecipeLike(recipe.id, {
+    onAuthRequired: () => navigate("/login"),
+    initialCount: recipe.likeCount ?? null,
+  });
   const displayTag = (t: string) => `#${toTitleCase(normalizeTag(t))}`;
 
   return (

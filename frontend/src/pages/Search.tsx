@@ -18,6 +18,7 @@ type Recipe = {
   image: string;
   tags: string[];
   created_at?: string;
+  likeCount?: number | null;
 };
 
 const PLACEHOLDER_IMAGE =
@@ -51,6 +52,7 @@ function TagPill({
 export default function Search() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [user, setUser] = useState<any | null>(null);
 
   const initialQ = (params.get("q") || "").trim();
   const [qInput, setQInput] = useState(initialQ);
@@ -73,6 +75,12 @@ export default function Search() {
     setQInput(queryFromURL);
   }, [queryFromURL]);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+  }, []);
+
   const isTagSearch = useMemo(() => {
     return queryFromURL.startsWith("#") && queryFromURL.slice(1).trim().length > 0;
   }, [queryFromURL]);
@@ -83,7 +91,7 @@ export default function Search() {
     try {
       let query = supabase
         .from("recipes")
-        .select("id, title, minutes, difficulty, image, tags, created_at", { count: "exact" });
+        .select("id, title, minutes, difficulty, image, tags, created_at, recipe_likes(count)", { count: "exact" });
       const q = queryFromURL;
       if (q) {
         if (isTagSearch) {
@@ -128,6 +136,12 @@ export default function Search() {
           image: row.image || PLACEHOLDER_IMAGE,
           tags: row.tags ?? [],
           created_at: row.created_at,
+          likeCount:
+            Array.isArray(row.recipe_likes) && row.recipe_likes.length > 0
+              ? row.recipe_likes[0]?.count ?? 0
+              : typeof row.recipe_likes?.count === "number"
+                ? row.recipe_likes.count
+                : null,
         })) ?? [];
 
       setResults(mapped);
@@ -181,7 +195,10 @@ export default function Search() {
             />
             <Button type="submit">Search</Button>
           </form>
-          <Button className="hidden md:inline-flex" onClick={() => navigate("/create")}>
+          <Button
+            className="hidden md:inline-flex"
+            onClick={() => (user ? navigate("/create") : navigate("/login"))}
+          >
             New recipe
           </Button>
         </div>
@@ -503,8 +520,11 @@ function RecipeCard({
   recipe: Recipe;
   onOpen: (id: string) => void;
 }) {
-  const { liked, count, loading, toggle } = useRecipeLike(recipe.id);
   const navigate = useNavigate();
+  const { liked, count, loading, toggle } = useRecipeLike(recipe.id, {
+    onAuthRequired: () => navigate("/login"),
+    initialCount: recipe.likeCount ?? null,
+  });
 
   return (
     <motion.article
