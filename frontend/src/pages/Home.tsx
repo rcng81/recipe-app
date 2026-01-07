@@ -36,6 +36,7 @@ type Recipe = {
   image: string;
   tags: string[];
   created_at?: string;
+  likeCount?: number | null;
 };
 
 const PLACEHOLDER_IMAGE =
@@ -69,6 +70,12 @@ export default function Home() {
       image: row.image || PLACEHOLDER_IMAGE,
       tags: row.tags ?? [],
       created_at: row.created_at,
+      likeCount:
+        Array.isArray(row.recipe_likes) && row.recipe_likes.length > 0
+          ? row.recipe_likes[0]?.count ?? 0
+          : typeof row.recipe_likes?.count === "number"
+            ? row.recipe_likes.count
+            : null,
     };
   }
 
@@ -151,7 +158,7 @@ export default function Home() {
       try {
         const { data: latestRows, error: latestErr } = await supabase
           .from("recipes")
-          .select("id, title, minutes, difficulty, image, tags, created_at")
+          .select("id, title, minutes, difficulty, image, tags, created_at, recipe_likes(count)")
           .order("created_at", { ascending: false })
           .limit(12);
         if (latestErr) throw latestErr;
@@ -1010,6 +1017,7 @@ function RecipeCard({
   const navigate = useNavigate();
   const { liked, count, loading, toggle } = useRecipeLike(recipe.id, {
     onAuthRequired: () => navigate("/login"),
+    initialCount: recipe.likeCount ?? null,
   });
   const displayTag = (t: string) => `#${toTitleCase(normalizeTag(t))}`;
 
