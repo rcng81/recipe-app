@@ -13,9 +13,6 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
   async function refresh() {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const uid = user?.id ?? null;
-
       const { count: totalCount, error: countErr } = await supabase
         .from("recipe_likes")
         .select("*", { count: "exact", head: true })
@@ -24,14 +21,20 @@ export function useRecipeLike(recipeId: string, options?: UseRecipeLikeOptions) 
       if (countErr) throw countErr;
       setCount(totalCount ?? 0);
 
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      const uid = user?.id ?? null;
+      if (userErr) {
+        console.warn("Failed to read auth user for likes:", userErr.message);
+      }
+
       if (uid) {
-        const { count: userCount, error: userErr } = await supabase
+        const { count: userCount, error: likedErr } = await supabase
           .from("recipe_likes")
           .select("*", { count: "exact", head: true })
           .eq("recipe_id", recipeId)
           .eq("user_id", uid);
 
-        if (userErr) throw userErr;
+        if (likedErr) throw likedErr;
         setLiked((userCount ?? 0) > 0);
       } else {
         setLiked(false);
