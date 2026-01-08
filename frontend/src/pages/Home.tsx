@@ -43,9 +43,11 @@ const PLACEHOLDER_IMAGE =
 
 export default function Home() {
   const navigate = useNavigate();
+
   const [loadingUser, setLoadingUser] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   const [latest, setLatest] = useState<Recipe[]>([]);
   const [trending, setTrending] = useState<Recipe[]>([]);
@@ -58,7 +60,6 @@ export default function Home() {
   const [saved, setSaved] = useState<Recipe[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [savedError, setSavedError] = useState<string | null>(null);
-
 
   function mapRowToRecipe(row: any): Recipe {
     return {
@@ -73,108 +74,132 @@ export default function Home() {
   }
 
   async function loadSaved() {
-  setLoadingSaved(true);
-  setSavedError(null);
-  try {
-    const { data: userRes, error: userErr } = await supabase.auth.getUser();
-    if (userErr) throw userErr;
-    const uid = userRes.user?.id;
-    if (!uid) {
-      setSaved([]);
-      setSavedError("Sign in to view saved recipes.");
-      return;
+    setLoadingSaved(true);
+    setSavedError(null);
+
+    try {
+      const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+
+      const uid = userRes.user?.id;
+      if (!uid) {
+        setSaved([]);
+        setSavedError("Sign in to view saved recipes.");
+        return;
+      }
+
+      const { data: likeRows, error: likeErr } = await supabase
+        .from("recipe_likes")
+        .select("recipe_id")
+        .eq("user_id", uid);
+
+      if (likeErr) throw likeErr;
+
+      const ids = (likeRows ?? []).map((r: any) => r.recipe_id);
+      if (ids.length === 0) {
+        setSaved([]);
+        return;
+      }
+
+      const { data: recipeRows, error: recipeErr } = await supabase
+        .from("recipes")
+        .select("id, title, minutes, difficulty, image, tags, created_at")
+        .in("id", ids)
+        .order("created_at", { ascending: false });
+
+      if (recipeErr) throw recipeErr;
+
+      setSaved((recipeRows ?? []).map(mapRowToRecipe));
+    } catch (e: any) {
+      setSavedError(e.message ?? "Failed to load saved recipes.");
+    } finally {
+      setLoadingSaved(false);
     }
-
-    const { data: likeRows, error: likeErr } = await supabase
-      .from("recipe_likes")
-      .select("recipe_id")
-      .eq("user_id", uid);
-
-    if (likeErr) throw likeErr;
-
-    const ids = (likeRows ?? []).map(r => r.recipe_id);
-    if (ids.length === 0) {
-      setSaved([]);
-      return;
-    }
-
-    const { data: recipeRows, error: recipeErr } = await supabase
-      .from("recipes")
-      .select("id, title, minutes, difficulty, image, tags, created_at")
-      .in("id", ids)
-      .order("created_at", { ascending: false });
-
-    if (recipeErr) throw recipeErr;
-
-    setSaved((recipeRows ?? []).map(mapRowToRecipe));
-  } catch (e: any) {
-    setSavedError(e.message ?? "Failed to load saved recipes.");
-  } finally {
-    setLoadingSaved(false);
   }
-}
 
+
+  // Load saved when tab opens (only matters if authed)
   useEffect(() => {
-    if (tabValue === "saved") {
-      loadSaved();
-    }
+    if (tabValue === "saved") loadSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabValue, user]);
 
 
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
 
-      if (!mounted) return;
-      setUser(session?.user ?? null);
-      const name =
-        (session?.user.user_metadata?.name as string | undefined) ??
-        session?.user.email?.split("@")[0] ??
-        null;
-      setDisplayName(name);
+  useEffect(() => {
+  let mounted = true;
+
+  (async () => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (!mounted) return;
+
+    // Guests are allowed on Home
+    if (error || !session) {
+      setUser(null);
+      setIsAuthed(false);
+      setDisplayName(null);
       setLoadingUser(false);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+      return;
+    }
 
-  useEffect(() => {
-    let mounted = true;
-    setLoadingFeed(true);
-    setFeedError(null);
-    (async () => {
-      try {
-        const { data: latestRows, error: latestErr } = await supabase
-          .from("recipes")
-          .select("id, title, minutes, difficulty, image, tags, created_at")
-          .order("created_at", { ascending: false })
-          .limit(12);
-        if (latestErr) throw latestErr;
+    setUser(session.user);
+    setIsAuthed(true);
 
-        const latestMapped = (latestRows ?? []).map(mapRowToRecipe);
-        if (mounted) {
-          setLatest(latestMapped);
-          setTrending(latestMapped);
-        }
-      } catch (err: any) {
-        if (mounted) {
-          setFeedError(err.message ?? "Failed to load recipes.");
-        }
-      } finally {
-        if (mounted) {
-          setLoadingFeed(false);
-        }
+    const name =
+      (session.user.user_metadata?.name as string | undefined) ??
+      session.user.email?.split("@")[0] ??
+      null;
+
+    setDisplayName(name);
+    setLoadingUser(false);
+  })();
+
+  return () => {
+    mounted = false;
+  };
+}, []);
+
+useEffect(() => {
+  let mounted = true;
+
+  setLoadingFeed(true);
+  setFeedError(null);
+
+  (async () => {
+    try {
+      const { data: latestRows, error: latestErr } = await supabase
+        .from("recipes")
+        .select("id, title, minutes, difficulty, image, tags, created_at")
+        .order("created_at", { ascending: false })
+        .limit(12);
+
+      if (latestErr) throw latestErr;
+
+      const latestMapped = (latestRows ?? []).map(mapRowToRecipe);
+
+      if (mounted) {
+        setLatest(latestMapped);
+        setTrending(latestMapped); // replace later if you add real trending logic
       }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    } catch (err: any) {
+      if (mounted) setFeedError(err.message ?? "Failed to load recipes.");
+    } finally {
+      if (mounted) setLoadingFeed(false);
+    }
+  })();
+
+  return () => {
+    mounted = false;
+  };
+}, []);
+
+
+
 
   const initials = useMemo(() => {
     if (!displayName) return "U";
@@ -214,59 +239,62 @@ export default function Home() {
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
           {/* Avatar opens Profile Sheet */}
-          {user ? (
-            <ProfileSheet
-              initials={initials}
-              displayName={displayName ?? "Chef"}
-              onSignOut={handleSignOut}
-              onDisplayNameUpdated={setDisplayName}
-            />
-          ) : (
-            <Avatar className="h-9 w-9">
-              <AvatarFallback>G</AvatarFallback>
-            </Avatar>
-          )}
 
-          <div className="mr-auto">
-            <p className="text-xs text-muted-foreground">
-              {user ? "Welcome back" : "Welcome"}
-            </p>
-            <p className="text-sm font-medium">{displayName ?? "Guest"}</p>
-          </div>
+          
+          {isAuthed ? (
+  <ProfileSheet
+    initials={initials}
+    displayName={displayName ?? "Chef"}
+    onSignOut={handleSignOut}
+    onDisplayNameUpdated={setDisplayName}
+  />
+) : (
+  <Avatar className="h-9 w-9">
+    <AvatarFallback>G</AvatarFallback>
+  </Avatar>
+)}
 
-          <form onSubmit={handleSearch} className="hidden md:flex items-center gap-2">
-            <Input
-              name="q"
-              placeholder="Search recipes, ingredients, tags…"
-              className="w-72"
-            />
-            <Button type="submit">Search</Button>
-          </form>
-          <Button
-            className="hidden md:inline-flex"
-            onClick={() => (user ? navigate("/create") : navigate("/login"))}
-          >
-            New recipe
-          </Button>
+<div className="mr-auto">
+  <p className="text-xs text-muted-foreground">
+    {isAuthed ? "Welcome back" : "Browsing as guest"}
+  </p>
+  <p className="text-sm font-medium">{displayName ?? "Guest"}</p>
+</div>
 
-          {/*Mobile button display*/}
-          <Button
-            size="icon"
-            className="md:hidden"
-            onClick={() => (user ? navigate("/create") : navigate("/login"))}
-          >
-            +
-          </Button>
+<form onSubmit={handleSearch} className="hidden md:flex items-center gap-2">
+  <Input
+    name="q"
+    placeholder="Search recipes, ingredients, tags…"
+    className="w-72"
+  />
+  <Button type="submit">Search</Button>
+</form>
 
-          {user ? (
-            <Button variant="outline" className="ml-2" onClick={handleSignOut}>
-              Sign out
-            </Button>
-          ) : (
-            <Button variant="outline" className="ml-2" onClick={() => navigate("/login")}>
-              Sign in
-            </Button>
-          )}
+<Button
+  className="hidden md:inline-flex"
+  onClick={() => (isAuthed ? navigate("/create") : navigate("/login"))}
+>
+  New recipe
+</Button>
+
+<Button
+  size="icon"
+  className="md:hidden"
+  onClick={() => (isAuthed ? navigate("/create") : navigate("/login"))}
+>
+  +
+</Button>
+
+{isAuthed ? (
+  <Button variant="outline" className="ml-2" onClick={handleSignOut}>
+    Sign out
+  </Button>
+) : (
+  <Button variant="outline" className="ml-2" onClick={() => navigate("/login")}>
+    Sign in
+  </Button>
+)}
+
         </div>
       </header>
 
@@ -292,7 +320,7 @@ export default function Home() {
                   <Button
                     variant="secondary"
                     type="button"
-                    onClick={() => (user ? navigate("/create") : navigate("/login"))}
+                    onClick={() => (isAuthed ? navigate("/create") : navigate("/login"))}
                   >
                     Create a recipe
                   </Button>
@@ -354,9 +382,12 @@ export default function Home() {
         <TabsTrigger value="new" className="data-[state=active]:font-semibold">
           New
         </TabsTrigger>
-        <TabsTrigger value="saved" className="data-[state=active]:font-semibold">
-          Saved
-        </TabsTrigger>
+        {isAuthed && (
+          <TabsTrigger value="saved" className="data-[state=active]:font-semibold">
+            Saved
+          </TabsTrigger>
+        )}
+
       </TabsList>
     </div>
 
@@ -364,7 +395,7 @@ export default function Home() {
     <TabsList className="md:hidden mt-2">
       <TabsTrigger value="trending">Trending</TabsTrigger>
       <TabsTrigger value="new">New</TabsTrigger>
-      <TabsTrigger value="saved">Saved</TabsTrigger>
+      {isAuthed && <TabsTrigger value="saved">Saved</TabsTrigger>}
     </TabsList>
 
     {/* Animated content area */}

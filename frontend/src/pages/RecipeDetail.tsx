@@ -317,7 +317,7 @@ export default function RecipeDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur border-b">
         <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-2">
@@ -337,7 +337,7 @@ export default function RecipeDetail() {
 
       {/* Main */}
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-6">
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden min-h-[520px] flex flex-col">
           {/* Cover image */}
           <motion.div
             layoutId={`image-${recipe.id}`}
@@ -396,7 +396,7 @@ export default function RecipeDetail() {
             ) : null}
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 flex-1">
             {safeDescription ? (
               <section className="space-y-2">
                 <h3 className="text-lg font-semibold">Description</h3>
@@ -437,7 +437,7 @@ export default function RecipeDetail() {
             </div>
           </CardContent>
 
-          <CardFooter className="flex items-center justify-between">
+          <CardFooter className="mt-auto flex items-center justify-between">
             <Button variant="ghost" onClick={() => navigate(-1)}>
               ← Back
             </Button>

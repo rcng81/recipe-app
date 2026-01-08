@@ -114,6 +114,16 @@ export default function AuthCard() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {isLogin ? "Log in" : "Create account"}
                 </Button>
+                {isLogin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/")}
+                  >
+                    Browse as guest
+                  </Button>
+                )}
 
                 {/* Accessible error/info messages */}
                 {errMsg && <span className="sr-only">{errMsg}</span>}
